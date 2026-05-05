@@ -44,35 +44,14 @@ Deno.serve(async (req) => {
       const link = post.link_url || "";
       const title = ((post.focus || "LinkedIn Beitrag") as string).slice(0, 200);
       const description = (lang === "en" ? (post.original_caption || "") : (post.translated_caption || "") || body).slice(0, 300);
+      // Make.com webhook payload — flat JSON, Make maps fields visually in the scenario.
       const payload = {
-        // Zapier LinkedIn-friendly top-level fields. Use `comment`/`text` for the visible LinkedIn post body.
         text,
-        comment: text,
-        commentary: text,
-        message: text,
-        post_text: text,
-        share_commentary: text,
         title,
         description,
         image_url,
-        image: image_url,
+        images,
         link,
-        url: link,
-        submitted_url: link,
-        submitted_image_url: image_url,
-        content__title: title,
-        content__description: description,
-        content__submitted_url: link,
-        content__submitted_image_url: image_url,
-        content__comment: text,
-        content: {
-          title,
-          description,
-          submitted_url: link,
-          submitted_image_url: image_url,
-          comment: text,
-        },
-        // Extras
         post_id: post.id,
         focus: post.focus,
         format: post.format,
@@ -82,8 +61,6 @@ Deno.serve(async (req) => {
         cta_de: post.translated_cta,
         cta_en: post.original_cta,
         hashtags: post.hashtags,
-        link_url: link,
-        images,
         publish_at: post.publish_at,
       };
       try {
