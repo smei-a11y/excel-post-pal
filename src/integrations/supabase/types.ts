@@ -16,16 +16,19 @@ export type Database = {
     Tables: {
       app_settings: {
         Row: {
+          caption_language: string
           id: number
           updated_at: string
           webhook_url: string | null
         }
         Insert: {
+          caption_language?: string
           id?: number
           updated_at?: string
           webhook_url?: string | null
         }
         Update: {
+          caption_language?: string
           id?: number
           updated_at?: string
           webhook_url?: string | null
