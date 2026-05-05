@@ -40,18 +40,28 @@ Deno.serve(async (req) => {
       const en = `${post.original_caption || ""}\n\n${post.original_cta || ""}`.trim();
       const body = lang === "en" ? en : lang === "both" ? `${de}\n\n— — —\n\n${en}` : de;
       const text = `${body}\n\n${tagLine}\n\n${post.link_url || ""}`.trim();
+      const image_url = images[0] || "";
+      const link = post.link_url || "";
+      const title = (post.focus || "").slice(0, 200);
+      const description = (lang === "en" ? (post.original_caption || "") : (post.translated_caption || "")).slice(0, 300);
       const payload = {
+        // Zapier LinkedIn-friendly top-level fields
+        text,
+        title,
+        description,
+        image_url,
+        link,
+        // Extras
         post_id: post.id,
         focus: post.focus,
         format: post.format,
         language: lang,
-        text,
         caption_de: post.translated_caption,
         caption_en: post.original_caption,
         cta_de: post.translated_cta,
         cta_en: post.original_cta,
         hashtags: post.hashtags,
-        link_url: post.link_url,
+        link_url: link,
         images,
         publish_at: post.publish_at,
       };
