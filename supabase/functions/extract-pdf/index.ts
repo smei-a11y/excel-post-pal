@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const { data: pdfBlob, error: dlErr } = await supabase.storage.from("post-pdfs").download(batch.pdf_path);
     if (dlErr || !pdfBlob) throw new Error("pdf download failed: " + dlErr?.message);
     const pdfBuf = new Uint8Array(await pdfBlob.arrayBuffer());
-    const pdfBase64 = btoa(String.fromCharCode(...pdfBuf.subarray(0, 0))) || base64Encode(pdfBuf);
+    const pdfBase64 = base64Encode(pdfBuf);
 
     const systemPrompt = `Du extrahierst LinkedIn-Posts aus einem PDF Content-Plan und übersetzt sie ins Deutsche.
 Gib für jeden Post zurück:
