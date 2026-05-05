@@ -14,7 +14,154 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      app_settings: {
+        Row: {
+          id: number
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          id?: number
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          id?: number
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      batches: {
+        Row: {
+          created_at: string
+          error: string | null
+          id: string
+          name: string
+          pdf_path: string | null
+          source_filename: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          name: string
+          pdf_path?: string | null
+          source_filename?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          error?: string | null
+          id?: string
+          name?: string
+          pdf_path?: string | null
+          source_filename?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      post_images: {
+        Row: {
+          created_at: string
+          id: string
+          post_id: string
+          public_url: string | null
+          sort_order: number
+          storage_path: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          post_id: string
+          public_url?: string | null
+          sort_order?: number
+          storage_path: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          post_id?: string
+          public_url?: string | null
+          sort_order?: number
+          storage_path?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "post_images_post_id_fkey"
+            columns: ["post_id"]
+            isOneToOne: false
+            referencedRelation: "posts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      posts: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          focus: string | null
+          format: string | null
+          hashtags: string[]
+          id: string
+          link_url: string | null
+          original_caption: string | null
+          original_cta: string | null
+          position: number
+          publish_at: string | null
+          published_at: string | null
+          status: string
+          translated_caption: string | null
+          translated_cta: string | null
+          webhook_response: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          focus?: string | null
+          format?: string | null
+          hashtags?: string[]
+          id?: string
+          link_url?: string | null
+          original_caption?: string | null
+          original_cta?: string | null
+          position?: number
+          publish_at?: string | null
+          published_at?: string | null
+          status?: string
+          translated_caption?: string | null
+          translated_cta?: string | null
+          webhook_response?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          focus?: string | null
+          format?: string | null
+          hashtags?: string[]
+          id?: string
+          link_url?: string | null
+          original_caption?: string | null
+          original_cta?: string | null
+          position?: number
+          publish_at?: string | null
+          published_at?: string | null
+          status?: string
+          translated_caption?: string | null
+          translated_cta?: string | null
+          webhook_response?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "posts_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
