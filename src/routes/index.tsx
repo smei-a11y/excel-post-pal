@@ -7,10 +7,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast, Toaster } from "sonner";
-import { Calendar, Upload, Send, Settings as SettingsIcon, Loader2, Trash2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import { Calendar, Upload, Send, Settings as SettingsIcon, Loader2, Trash2, CheckCircle2, AlertCircle, Clock, ImageIcon } from "lucide-react";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 
 export const Route = createFileRoute("/")({ component: App });
 
+type PostImage = { id: string; public_url: string | null; sort_order: number };
 type Post = {
   id: string;
   batch_id: string;
@@ -18,6 +21,7 @@ type Post = {
   focus: string | null;
   format: string | null;
   original_caption: string | null;
+  original_cta: string | null;
   translated_caption: string | null;
   translated_cta: string | null;
   hashtags: string[];
@@ -26,26 +30,30 @@ type Post = {
   status: string;
   published_at: string | null;
   webhook_response: string | null;
+  post_images?: PostImage[];
 };
 
 type Batch = { id: string; name: string; status: string; error: string | null; created_at: string };
+type Lang = "de" | "en" | "both";
 
 function App() {
   const [batches, setBatches] = useState<Batch[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [webhook, setWebhook] = useState("");
+  const [lang, setLang] = useState<Lang>("de");
   const [uploading, setUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
   const load = useCallback(async () => {
     const [b, p, s] = await Promise.all([
       supabase.from("batches").select("*").order("created_at", { ascending: false }),
-      supabase.from("posts").select("*").order("publish_at", { ascending: true }),
-      supabase.from("app_settings").select("webhook_url").eq("id", 1).single(),
+      supabase.from("posts").select("*, post_images(id, public_url, sort_order)").order("publish_at", { ascending: true }),
+      supabase.from("app_settings").select("webhook_url, caption_language").eq("id", 1).single(),
     ]);
     if (b.data) setBatches(b.data as any);
     if (p.data) setPosts(p.data as any);
     if (s.data?.webhook_url) setWebhook(s.data.webhook_url);
+    if ((s.data as any)?.caption_language) setLang((s.data as any).caption_language as Lang);
   }, []);
 
   useEffect(() => {
@@ -86,10 +94,10 @@ function App() {
     }
   };
 
-  const saveWebhook = async () => {
-    const { error } = await supabase.from("app_settings").update({ webhook_url: webhook, updated_at: new Date().toISOString() }).eq("id", 1);
+  const saveSettings = async () => {
+    const { error } = await supabase.from("app_settings").update({ webhook_url: webhook, caption_language: lang, updated_at: new Date().toISOString() }).eq("id", 1);
     if (error) toast.error(error.message);
-    else toast.success("Webhook gespeichert");
+    else toast.success("Einstellungen gespeichert");
   };
 
   const publishNow = async (postId: string) => {
@@ -127,22 +135,31 @@ function App() {
             <p className="text-sm text-muted-foreground">PDF hochladen · Automatisch übersetzen · Geplant veröffentlichen</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setShowSettings((s) => !s)}>
-            <SettingsIcon /> Webhook
+            <SettingsIcon /> Einstellungen
           </Button>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
         {showSettings && (
-          <Card className="p-6 space-y-3">
-            <h2 className="font-semibold">Webhook-URL (Make / Zapier / n8n)</h2>
-            <p className="text-sm text-muted-foreground">
-              Geplante Posts werden zur eingestellten Zeit per POST an diese URL gesendet (mit Text, Hashtags, Bildern, Link).
-            </p>
-            <div className="flex gap-2">
+          <Card className="p-6 space-y-5">
+            <div className="space-y-3">
+              <h2 className="font-semibold">Webhook-URL (Make / Zapier / n8n)</h2>
+              <p className="text-sm text-muted-foreground">
+                Geplante Posts werden zur eingestellten Zeit per POST an diese URL gesendet (mit Text, Hashtags, Bildern, Link).
+              </p>
               <Input value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://hooks.zapier.com/..." />
-              <Button onClick={saveWebhook}>Speichern</Button>
             </div>
+            <div className="space-y-3">
+              <h2 className="font-semibold">Caption-Sprache</h2>
+              <p className="text-sm text-muted-foreground">Welche Sprache soll im veröffentlichten Post-Text enthalten sein?</p>
+              <RadioGroup value={lang} onValueChange={(v) => setLang(v as Lang)} className="flex gap-4">
+                <div className="flex items-center gap-2"><RadioGroupItem value="de" id="l-de" /><Label htmlFor="l-de">Deutsch</Label></div>
+                <div className="flex items-center gap-2"><RadioGroupItem value="en" id="l-en" /><Label htmlFor="l-en">Englisch</Label></div>
+                <div className="flex items-center gap-2"><RadioGroupItem value="both" id="l-both" /><Label htmlFor="l-both">Beide</Label></div>
+              </RadioGroup>
+            </div>
+            <Button onClick={saveSettings}>Speichern</Button>
           </Card>
         )}
 
@@ -182,7 +199,7 @@ function App() {
           ) : (
             <div className="grid gap-4">
               {posts.map((p) => (
-                <PostCard key={p.id} post={p} onPublish={() => publishNow(p.id)} onDelete={() => deletePost(p.id)} onUpdate={(patch) => updatePost(p.id, patch)} />
+                <PostCard key={p.id} post={p} lang={lang} onPublish={() => publishNow(p.id)} onDelete={() => deletePost(p.id)} onUpdate={(patch) => updatePost(p.id, patch)} />
               ))}
             </div>
           )}
@@ -223,8 +240,8 @@ function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: Fil
   );
 }
 
-function PostCard({ post, onPublish, onDelete, onUpdate }: {
-  post: Post; onPublish: () => void; onDelete: () => void; onUpdate: (patch: Partial<Post>) => void;
+function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
+  post: Post; lang: Lang; onPublish: () => void; onDelete: () => void; onUpdate: (patch: Partial<Post>) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [caption, setCaption] = useState(post.translated_caption || "");
@@ -242,6 +259,10 @@ function PostCard({ post, onPublish, onDelete, onUpdate }: {
     setEditing(false);
   };
 
+  const images = (post.post_images || []).slice().sort((a, b) => a.sort_order - b.sort_order);
+  const showDe = lang === "de" || lang === "both";
+  const showEn = lang === "en" || lang === "both";
+
   return (
     <Card className="p-5 space-y-3">
       <div className="flex items-start justify-between gap-3">
@@ -252,6 +273,18 @@ function PostCard({ post, onPublish, onDelete, onUpdate }: {
         </div>
         <StatusBadge status={post.status} />
       </div>
+
+      {images.length > 0 ? (
+        <div className="flex gap-2 overflow-x-auto">
+          {images.map((img) => (
+            img.public_url ? (
+              <img key={img.id} src={img.public_url} alt="" className="h-40 w-auto rounded-md border object-cover" loading="lazy" />
+            ) : null
+          ))}
+        </div>
+      ) : (
+        <div className="text-xs text-muted-foreground flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Keine Bilder</div>
+      )}
 
       {editing ? (
         <div className="space-y-3">
@@ -278,8 +311,20 @@ function PostCard({ post, onPublish, onDelete, onUpdate }: {
         </div>
       ) : (
         <>
-          <p className="text-sm whitespace-pre-wrap leading-relaxed">{post.translated_caption}</p>
-          {post.translated_cta && <p className="text-sm font-medium text-primary">{post.translated_cta}</p>}
+          {showDe && (
+            <div className="space-y-1">
+              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Deutsch</div>}
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{post.translated_caption}</p>
+              {post.translated_cta && <p className="text-sm font-medium text-primary">{post.translated_cta}</p>}
+            </div>
+          )}
+          {showEn && (
+            <div className="space-y-1">
+              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">English</div>}
+              <p className="text-sm whitespace-pre-wrap leading-relaxed">{post.original_caption}</p>
+              {post.original_cta && <p className="text-sm font-medium text-primary">{post.original_cta}</p>}
+            </div>
+          )}
           {post.hashtags?.length > 0 && (
             <div className="flex flex-wrap gap-1">
               {post.hashtags.map((h) => (
@@ -307,16 +352,6 @@ function PostCard({ post, onPublish, onDelete, onUpdate }: {
       )}
     </Card>
   );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const map: Record<string, { label: string; cls: string }> = {
-    scheduled: { label: "Geplant", cls: "bg-accent text-accent-foreground" },
-    published: { label: "Veröffentlicht", cls: "bg-success text-success-foreground" },
-    failed: { label: "Fehler", cls: "bg-destructive text-destructive-foreground" },
-  };
-  const m = map[status] || { label: status, cls: "bg-muted" };
-  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.cls}`}>{m.label}</span>;
 }
 
 function StatusIcon({ status }: { status: string }) {
