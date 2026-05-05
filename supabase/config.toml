@@ -1,1 +1,7 @@
 project_id = "kbcqvqfnavkagdngapff"
+
+[functions.extract-pdf]
+verify_jwt = false
+
+[functions.publish-due-posts]
+verify_jwt = false
