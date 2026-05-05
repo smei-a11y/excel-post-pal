@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
         title,
         description,
         image_url,
-        image,
+        image: image_url,
         link,
         url: link,
         submitted_url: link,
