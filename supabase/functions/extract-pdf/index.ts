@@ -184,32 +184,49 @@ Gib für jeden Post zurück:
   }
 });
 
-// Extract embedded images from a PDF page; fallback to rendering the page as PNG
+// Extract embedded images from a PDF page (no full-page fallback).
 async function extractPageImages(doc: any, pageIdx: number): Promise<Uint8Array[]> {
   const page = doc.loadPage(pageIdx);
   const out: Uint8Array[] = [];
+  const seen = new Set<string>();
 
-  // Try to extract embedded images via structured text (mupdf groups blocks; image blocks expose pixmap)
+  const pushPixmap = (pixmap: any) => {
+    try {
+      const w = pixmap.getWidth?.() ?? pixmap.width;
+      const h = pixmap.getHeight?.() ?? pixmap.height;
+      if (w && h && (w < 80 || h < 80)) return; // skip icons/decorations
+      const png = new Uint8Array(pixmap.asPNG());
+      const key = `${png.length}:${png[16]}-${png[32]}-${png[64] ?? 0}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(png);
+    } catch (e) {
+      console.log("pixmap convert failed:", e);
+    }
+  };
+
   try {
     const stext = page.toStructuredText("preserve-images");
-    const json = JSON.parse(stext.asJSON());
-    for (const block of json.blocks || []) {
-      if (block.type === "image" && block.image) {
-        // image is a base64 data URI string in some mupdf builds; if not available, skip
-        const m = /^data:image\/[^;]+;base64,(.+)$/.exec(block.image);
-        if (m) out.push(base64Decode(m[1]));
-      }
+    if (typeof stext.walk === "function") {
+      stext.walk({
+        onImageBlock(_bbox: unknown, _transform: unknown, image: any) {
+          try { pushPixmap(image.toPixmap()); } catch (e) { console.log("image.toPixmap failed:", e); }
+        },
+      });
+    }
+    if (out.length === 0) {
+      try {
+        const json = JSON.parse(stext.asJSON());
+        for (const block of json.blocks || []) {
+          if (block.type === "image" && typeof block.image === "string") {
+            const m = /^data:image\/[^;]+;base64,(.+)$/.exec(block.image);
+            if (m) out.push(base64Decode(m[1]));
+          }
+        }
+      } catch {}
     }
   } catch (e) {
     console.log("structured text extraction failed:", e);
-  }
-
-  // Fallback: render the entire page as a single PNG
-  if (out.length === 0) {
-    const matrix = mupdf.Matrix.scale(2, 2);
-    const pixmap = page.toPixmap(matrix, mupdf.ColorSpace.DeviceRGB, false, true);
-    const png = pixmap.asPNG();
-    out.push(new Uint8Array(png));
   }
 
   return out;
