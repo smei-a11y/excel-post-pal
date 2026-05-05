@@ -120,7 +120,8 @@ function App() {
   };
 
   const updatePost = async (id: string, patch: Partial<Post>) => {
-    const { error } = await supabase.from("posts").update(patch).eq("id", id);
+    const { post_images: _omit, ...rest } = patch as any;
+    const { error } = await supabase.from("posts").update(rest).eq("id", id);
     if (error) toast.error(error.message);
     else load();
   };
@@ -352,6 +353,16 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
       )}
     </Card>
   );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const map: Record<string, { label: string; cls: string }> = {
+    scheduled: { label: "Geplant", cls: "bg-accent text-accent-foreground" },
+    published: { label: "Veröffentlicht", cls: "bg-success text-success-foreground" },
+    failed: { label: "Fehler", cls: "bg-destructive text-destructive-foreground" },
+  };
+  const m = map[status] || { label: status, cls: "bg-muted" };
+  return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.cls}`}>{m.label}</span>;
 }
 
 function StatusIcon({ status }: { status: string }) {
