@@ -24,8 +24,9 @@ Deno.serve(async (req) => {
       : await q.lte("publish_at", new Date().toISOString());
     if (error) throw error;
 
-    const { data: settings } = await supabase.from("app_settings").select("webhook_url").eq("id", 1).single();
+    const { data: settings } = await supabase.from("app_settings").select("webhook_url, caption_language").eq("id", 1).single();
     const webhook = settings?.webhook_url;
+    const lang = (settings?.caption_language || "de") as "de" | "en" | "both";
 
     const results: any[] = [];
     for (const post of posts || []) {
@@ -34,14 +35,21 @@ Deno.serve(async (req) => {
         continue;
       }
       const images = (post.post_images || []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((i: any) => i.public_url);
-      const text = `${post.translated_caption}\n\n${post.translated_cta || ""}\n\n${(post.hashtags || []).map((h: string) => "#" + h.replace(/^#/, "")).join(" ")}\n\n${post.link_url || ""}`.trim();
+      const tagLine = (post.hashtags || []).map((h: string) => "#" + h.replace(/^#/, "")).join(" ");
+      const de = `${post.translated_caption || ""}\n\n${post.translated_cta || ""}`.trim();
+      const en = `${post.original_caption || ""}\n\n${post.original_cta || ""}`.trim();
+      const body = lang === "en" ? en : lang === "both" ? `${de}\n\n— — —\n\n${en}` : de;
+      const text = `${body}\n\n${tagLine}\n\n${post.link_url || ""}`.trim();
       const payload = {
         post_id: post.id,
         focus: post.focus,
         format: post.format,
+        language: lang,
         text,
-        caption: post.translated_caption,
-        cta: post.translated_cta,
+        caption_de: post.translated_caption,
+        caption_en: post.original_caption,
+        cta_de: post.translated_cta,
+        cta_en: post.original_cta,
         hashtags: post.hashtags,
         link_url: post.link_url,
         images,
