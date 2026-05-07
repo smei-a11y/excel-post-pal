@@ -410,19 +410,19 @@ function App() {
         <Card className="p-6 bg-accent/30 border-dashed">
           <h2 className="font-semibold mb-3 flex items-center gap-2">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">?</span>
-            So funktioniert's
+            How it works
           </h2>
           <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
             <li>
               <span className="text-foreground font-medium">
                 <LinkedInGuideDialog />:
               </span>{" "}
-              Öffne <em>Einstellungen</em> oben rechts und klicke auf <em>Mit LinkedIn verbinden</em>. Im neuen Tab anmelden und Berechtigungen erteilen.
+              Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in in the new tab and grant the permissions.
             </li>
-            <li><span className="text-foreground font-medium">Caption-Sprache wählen:</span> In den Einstellungen festlegen, ob Posts auf Deutsch oder Englisch veröffentlicht werden.</li>
-            <li><span className="text-foreground font-medium">PDF hochladen:</span> Content-PDF unten per Drag &amp; Drop oder Auswahl hochladen. Die KI extrahiert Captions, Bilder, Datum, Uhrzeit und Hashtags und übersetzt automatisch.</li>
-            <li><span className="text-foreground font-medium">Posts prüfen &amp; bearbeiten:</span> Jeden Post unten kontrollieren, Text/CTA/Hashtags und Veröffentlichungszeitpunkt bei Bedarf anpassen.</li>
-            <li><span className="text-foreground font-medium">Veröffentlichen:</span> Posts werden zum geplanten Zeitpunkt automatisch publiziert — oder per <em>Jetzt senden</em> sofort.</li>
+            <li><span className="text-foreground font-medium">Choose caption language:</span> In Settings, pick the target language for your published posts.</li>
+            <li><span className="text-foreground font-medium">Upload PDF:</span> Drag &amp; drop or pick your content PDF below. The AI extracts captions, images, date, time and hashtags and translates automatically.</li>
+            <li><span className="text-foreground font-medium">Review &amp; edit posts:</span> Check each post below and adjust text, CTA, hashtags or scheduled time if needed.</li>
+            <li><span className="text-foreground font-medium">Publish:</span> Posts go live automatically at the scheduled time — or instantly with <em>Send now</em>.</li>
           </ol>
         </Card>
 
