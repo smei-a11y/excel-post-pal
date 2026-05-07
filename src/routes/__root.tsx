@@ -31,6 +31,14 @@ export const Route = createRootRoute({
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "LinkedIn Content Planer" },
       { name: "description", content: "PDF hochladen, KI übersetzt und plant LinkedIn-Posts" },
+      { property: "og:title", content: "LinkedIn Content Planer" },
+      { name: "twitter:title", content: "LinkedIn Content Planer" },
+      { property: "og:description", content: "PDF hochladen, KI übersetzt und plant LinkedIn-Posts" },
+      { name: "twitter:description", content: "PDF hochladen, KI übersetzt und plant LinkedIn-Posts" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/ea8a5c5b-75a9-4a7b-b3e3-823b3da397b0" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/ea8a5c5b-75a9-4a7b-b3e3-823b3da397b0" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:type", content: "website" },
     ],
     links: [
       {
