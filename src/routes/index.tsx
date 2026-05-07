@@ -421,7 +421,7 @@ function App() {
               Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in in the new tab and grant the permissions.
             </li>
             <li><span className="text-foreground font-medium">Choose caption language:</span> In Settings, pick the target language for your published posts.</li>
-            <li><span className="text-foreground font-medium">Upload PDF:</span> Drag &amp; drop or pick your content PDF below. The AI extracts captions, images, date, time and hashtags and translates automatically.</li>
+            <li><span className="text-foreground font-medium">Upload PDF or PPTX:</span> Drag &amp; drop or pick your content file below. The AI extracts captions, images, date, time and hashtags and translates automatically. Use PPTX if your plan contains videos.</li>
             <li><span className="text-foreground font-medium">Review &amp; edit posts:</span> Check each post below and adjust text, CTA, hashtags or scheduled time if needed.</li>
             <li><span className="text-foreground font-medium">Publish:</span> Posts go live automatically at the scheduled time — or instantly with <em>Send now</em>.</li>
           </ol>
