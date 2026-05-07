@@ -431,7 +431,7 @@ function App() {
 
         {batches.length > 0 && (
           <section>
-            <h2 className="font-semibold mb-3">PDF uploads</h2>
+            <h2 className="font-semibold mb-3">PPTX uploads</h2>
             <div className="grid gap-2">
               {batches.map((b) => (
                 <Card key={b.id} className="px-4 py-3 flex items-center justify-between">
