@@ -344,7 +344,7 @@ function App() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planner</h1>
-            <p className="text-sm text-muted-foreground">Upload PDF · Auto-translate · Schedule and publish</p>
+            <p className="text-sm text-muted-foreground">Upload PPTX · Auto-translate · Schedule and publish</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:inline">{userEmail}</span>
