@@ -474,7 +474,6 @@ function App() {
 }
 
 function FeedbackFooter() {
-  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -501,7 +500,7 @@ function FeedbackFooter() {
           templateName: "feedback",
           recipientEmail: "smei@boconcept.de",
           templateData: {
-            fromEmail: email.trim() || session.user.email || "anonymous",
+            fromEmail: session.user.email || "anonymous",
             message: message.trim(),
             source: window.location.hostname,
           },
@@ -512,7 +511,7 @@ function FeedbackFooter() {
         throw new Error(err.error || `Request failed (${res.status})`);
       }
       toast.success("Thanks! Your feedback was sent.");
-      setEmail(""); setMessage("");
+      setMessage("");
     } catch (e: any) {
       toast.error(e?.message || "Failed to send feedback");
     } finally {
