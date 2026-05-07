@@ -216,8 +216,9 @@ function App() {
 
   const onUpload = async (file: File) => {
     if (!userId) return;
-    if (!file.name.toLowerCase().endsWith(".pdf")) {
-      toast.error("Please upload a PDF file");
+    const lower = file.name.toLowerCase();
+    if (!lower.endsWith(".pdf") && !lower.endsWith(".pptx")) {
+      toast.error("Please upload a PDF or PPTX file");
       return;
     }
     setUploading(true);
@@ -232,7 +233,7 @@ function App() {
         pdf_path: path,
       }).select().single();
       if (bErr) throw bErr;
-      toast.success("PDF uploaded — AI is now extracting the posts...");
+      toast.success("File uploaded — AI is now extracting the posts...");
       const { error: fnErr } = await supabase.functions.invoke("extract-pdf", { body: { batchId: batch.id } });
       if (fnErr) throw fnErr;
       toast.success("Posts extracted and translated!");
@@ -490,13 +491,13 @@ function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: Fil
           {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
         </div>
         <div>
-          <h3 className="font-medium">Upload a new content PDF</h3>
-          <p className="text-sm text-muted-foreground">AI extracts captions, date, time and hashtags and translates automatically.</p>
+          <h3 className="font-medium">Upload a new content plan (PDF or PPTX)</h3>
+          <p className="text-sm text-muted-foreground">AI extracts captions, date, time and hashtags and translates automatically. PPTX preserves embedded videos.</p>
         </div>
         <label>
-          <input type="file" accept="application/pdf" className="hidden" disabled={uploading}
+          <input type="file" accept="application/pdf,.pdf,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-          <Button asChild disabled={uploading}><span>{uploading ? "Processing..." : "Choose PDF"}</span></Button>
+          <Button asChild disabled={uploading}><span>{uploading ? "Processing..." : "Choose file"}</span></Button>
         </label>
       </div>
     </Card>
