@@ -140,18 +140,54 @@ Deno.serve(async (req) => {
       : await q.lte("publish_at", new Date().toISOString());
     if (error) throw error;
 
-    // Cache settings per user
+    // Cache settings per user (with auto-refresh of LinkedIn token)
     const settingsCache = new Map<string, { lang: Lang; token: string; author: string }>();
+    async function refreshLinkedInToken(uid: string, refreshToken: string): Promise<string | null> {
+      const clientId = Deno.env.get("LINKEDIN_CLIENT_ID");
+      const clientSecret = Deno.env.get("LINKEDIN_CLIENT_SECRET");
+      if (!clientId || !clientSecret) return null;
+      const form = new URLSearchParams({
+        grant_type: "refresh_token",
+        refresh_token: refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+      });
+      const r = await fetch("https://www.linkedin.com/oauth/v2/accessToken", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+      });
+      if (!r.ok) return null;
+      const t = await r.json();
+      const update: Record<string, any> = {
+        user_id: uid,
+        linkedin_access_token: t.access_token,
+        linkedin_token_expires_at: new Date(Date.now() + (t.expires_in || 0) * 1000).toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      if (t.refresh_token) update.linkedin_refresh_token = t.refresh_token;
+      if (t.refresh_token_expires_in) update.linkedin_refresh_expires_at = new Date(Date.now() + t.refresh_token_expires_in * 1000).toISOString();
+      await supabase.from("app_settings").upsert(update, { onConflict: "user_id" });
+      return t.access_token as string;
+    }
     async function getSettings(uid: string) {
       if (settingsCache.has(uid)) return settingsCache.get(uid)!;
       const { data: s } = await supabase
         .from("app_settings")
-        .select("caption_language, linkedin_access_token, linkedin_author_urn")
+        .select("caption_language, linkedin_access_token, linkedin_author_urn, linkedin_refresh_token, linkedin_token_expires_at")
         .eq("user_id", uid)
         .maybeSingle();
+      let token = s?.linkedin_access_token || "";
+      // Refresh if expired or expires within 5 minutes
+      const expAt = s?.linkedin_token_expires_at ? new Date(s.linkedin_token_expires_at).getTime() : 0;
+      const needsRefresh = !token || (expAt && expAt - Date.now() < 5 * 60 * 1000);
+      if (needsRefresh && s?.linkedin_refresh_token) {
+        const newTok = await refreshLinkedInToken(uid, s.linkedin_refresh_token);
+        if (newTok) token = newTok;
+      }
       const v = {
         lang: ((s?.caption_language || "de") as Lang),
-        token: s?.linkedin_access_token || "",
+        token,
         author: s?.linkedin_author_urn || "",
       };
       settingsCache.set(uid, v);
