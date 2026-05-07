@@ -287,7 +287,6 @@ function App() {
               <RadioGroup value={lang} onValueChange={(v) => setLang(v as Lang)} className="flex gap-4">
                 <div className="flex items-center gap-2"><RadioGroupItem value="de" id="l-de" /><Label htmlFor="l-de">Deutsch</Label></div>
                 <div className="flex items-center gap-2"><RadioGroupItem value="en" id="l-en" /><Label htmlFor="l-en">Englisch</Label></div>
-                <div className="flex items-center gap-2"><RadioGroupItem value="both" id="l-both" /><Label htmlFor="l-both">Beide</Label></div>
               </RadioGroup>
             </div>
             <Button onClick={saveSettings}>Speichern</Button>
