@@ -32,10 +32,18 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Resolve calling user from JWT for ownership stamping
+    const authHeader = req.headers.get("Authorization") || "";
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: userRes } = await supabase.auth.getUser(jwt);
+    const userId = userRes?.user?.id;
+    if (!userId) throw new Error("Nicht authentifiziert");
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not set");
 
-    const { data: batch, error: bErr } = await supabase.from("batches").select("*").eq("id", batchId).single();
+    const { data: batch, error: bErr } = await supabase.from("batches").select("*").eq("id", batchId).eq("user_id", userId).single();
     if (bErr || !batch) throw new Error("batch not found");
 
     const { data: pdfBlob, error: dlErr } = await supabase.storage.from("post-pdfs").download(batch.pdf_path);
