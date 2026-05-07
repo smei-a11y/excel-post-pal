@@ -47,13 +47,19 @@ function LinkedInGuideDialog() {
 
           <section className="space-y-2">
             <h3 className="font-semibold text-foreground">2. Redirect-URLs hinterlegen</h3>
-            <p className="text-muted-foreground">Im Tab <em>Auth</em> unter <em>Authorized redirect URLs for your app</em> folgende URL eintragen (für jede Umgebung — Preview und Live-Domain — separat hinzufügen):</p>
-            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs break-all">
-              <span className="flex-1">{redirectUri || ".../linkedin-callback"}</span>
-              <Button size="icon" variant="ghost" onClick={() => copy(redirectUri)} disabled={!redirectUri}><Copy /></Button>
-            </div>
+            <p className="text-muted-foreground">Im Tab <em>Auth</em> unter <em>Authorized redirect URLs for your app</em> folgende URLs eintragen (jede URL als separaten Eintrag hinzufügen):</p>
+            {[
+              redirectUri,
+              "https://www.linkedincontentgenerator.com/linkedin-callback",
+              "https://linkedincontentgenerator.com/linkedin-callback",
+            ].filter(Boolean).map((url) => (
+              <div key={url} className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs break-all">
+                <span className="flex-1">{url}</span>
+                <Button size="icon" variant="ghost" onClick={() => copy(url)}><Copy /></Button>
+              </div>
+            ))}
             <p className="text-xs text-muted-foreground">
-              Mehrere URLs sind erlaubt. Nach dem Veröffentlichen die Live-Domain (z.B. <code>https://deine-domain.com/linkedin-callback</code>) ebenfalls eintragen.
+              Die erste URL ist die aktuelle Preview-Umgebung, die anderen beiden sind die Live-Domain (mit und ohne <code>www</code>).
             </p>
           </section>
 
