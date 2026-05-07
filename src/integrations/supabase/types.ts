@@ -19,6 +19,10 @@ export type Database = {
           caption_language: string
           linkedin_access_token: string | null
           linkedin_author_urn: string | null
+          linkedin_connected_name: string | null
+          linkedin_refresh_expires_at: string | null
+          linkedin_refresh_token: string | null
+          linkedin_token_expires_at: string | null
           updated_at: string
           user_id: string
           webhook_url: string | null
@@ -27,6 +31,10 @@ export type Database = {
           caption_language?: string
           linkedin_access_token?: string | null
           linkedin_author_urn?: string | null
+          linkedin_connected_name?: string | null
+          linkedin_refresh_expires_at?: string | null
+          linkedin_refresh_token?: string | null
+          linkedin_token_expires_at?: string | null
           updated_at?: string
           user_id: string
           webhook_url?: string | null
@@ -35,6 +43,10 @@ export type Database = {
           caption_language?: string
           linkedin_access_token?: string | null
           linkedin_author_urn?: string | null
+          linkedin_connected_name?: string | null
+          linkedin_refresh_expires_at?: string | null
+          linkedin_refresh_token?: string | null
+          linkedin_token_expires_at?: string | null
           updated_at?: string
           user_id?: string
           webhook_url?: string | null
@@ -71,6 +83,24 @@ export type Database = {
           source_filename?: string | null
           status?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      linkedin_oauth_states: {
+        Row: {
+          created_at: string
+          state: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          state: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          state?: string
+          user_id?: string
         }
         Relationships: []
       }
