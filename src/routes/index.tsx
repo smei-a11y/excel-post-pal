@@ -99,7 +99,13 @@ function App() {
   };
 
   const saveSettings = async () => {
-    const { error } = await supabase.from("app_settings").update({ webhook_url: webhook, caption_language: lang, updated_at: new Date().toISOString() }).eq("id", 1);
+    const { error } = await supabase.from("app_settings").update({
+      webhook_url: webhook,
+      caption_language: lang,
+      linkedin_access_token: liToken || null,
+      linkedin_author_urn: liAuthor || null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", 1);
     if (error) toast.error(error.message);
     else toast.success("Einstellungen gespeichert");
   };
