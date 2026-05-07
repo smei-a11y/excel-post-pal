@@ -1,0 +1,8 @@
+# Lässt gcloud das ganze Verzeichnis hochladen (sonst skipped es Dotfiles etc.)
+node_modules/
+npm-debug.log
+.env
+.env.*
+.git/
+.gitignore
+README.md
