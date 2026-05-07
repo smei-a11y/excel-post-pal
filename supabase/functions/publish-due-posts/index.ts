@@ -79,12 +79,43 @@ Deno.serve(async (req) => {
       const body = lang === "en" ? en : lang === "both" ? `${de}\n\n— — —\n\n${en}` : de;
       const caption = `${body}\n\n${tagLine}\n\n${post.link_url || ""}`.trim();
 
+      // Helpers to derive file_name + mime_type from URL
+      const getFileName = (url: string) => {
+        try {
+          const u = new URL(url);
+          const last = u.pathname.split("/").pop() || "file";
+          return decodeURIComponent(last);
+        } catch {
+          return "file";
+        }
+      };
+      const getMimeType = (fileName: string) => {
+        const ext = fileName.split(".").pop()?.toLowerCase() || "";
+        const map: Record<string, string> = {
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          png: "image/png",
+          gif: "image/gif",
+          webp: "image/webp",
+          mp4: "video/mp4",
+          mov: "video/quicktime",
+          webm: "video/webm",
+        };
+        return map[ext] || "application/octet-stream";
+      };
+
       // Determine post_type
-      let post_type: "TEXT" | "IMAGE" | "VIDEO" | "CAROUSEL" = "TEXT";
-      const media = images.map((url) => ({ type: "image" as const, url }));
-      if (images.length > 1) post_type = "CAROUSEL";
-      else if (images.length === 1) post_type = "IMAGE";
-      // VIDEO not yet supported in schema (no video field)
+      let post_type: "TEXT" | "SINGLE IMAGE" | "VIDEO" | "CAROUSEL" = "TEXT";
+      const media = images.map((url) => {
+        const file_name = getFileName(url);
+        const mime_type = getMimeType(file_name);
+        const type = mime_type.startsWith("video/") ? "video" : "image";
+        return { type, url, file_name, mime_type };
+      });
+      const hasVideo = media.some((m) => m.type === "video");
+      if (hasVideo) post_type = "VIDEO";
+      else if (images.length > 1) post_type = "CAROUSEL";
+      else if (images.length === 1) post_type = "SINGLE IMAGE";
 
       const payload = {
         post_type,
