@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast, Toaster } from "sonner";
 import { Calendar, Upload, Send, Settings as SettingsIcon, Loader2, Trash2, CheckCircle2, AlertCircle, Clock, ImageIcon, LogOut, Copy } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
@@ -115,7 +116,36 @@ type Post = {
 };
 
 type Batch = { id: string; name: string; status: string; error: string | null; created_at: string };
-type Lang = "de" | "en" | "both";
+type Lang = string; // ISO-Code der Zielsprache, "en" = Original (keine Übersetzung), "both" = DE + EN
+
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: "de", label: "Deutsch" },
+  { code: "en", label: "Englisch (Original)" },
+  { code: "both", label: "Deutsch + Englisch" },
+  { code: "fr", label: "Französisch" },
+  { code: "es", label: "Spanisch" },
+  { code: "it", label: "Italienisch" },
+  { code: "pt", label: "Portugiesisch" },
+  { code: "nl", label: "Niederländisch" },
+  { code: "pl", label: "Polnisch" },
+  { code: "sv", label: "Schwedisch" },
+  { code: "no", label: "Norwegisch" },
+  { code: "da", label: "Dänisch" },
+  { code: "fi", label: "Finnisch" },
+  { code: "cs", label: "Tschechisch" },
+  { code: "sk", label: "Slowakisch" },
+  { code: "hu", label: "Ungarisch" },
+  { code: "ro", label: "Rumänisch" },
+  { code: "bg", label: "Bulgarisch" },
+  { code: "el", label: "Griechisch" },
+  { code: "hr", label: "Kroatisch" },
+  { code: "sl", label: "Slowenisch" },
+  { code: "et", label: "Estnisch" },
+  { code: "lv", label: "Lettisch" },
+  { code: "lt", label: "Litauisch" },
+  { code: "ga", label: "Irisch" },
+  { code: "mt", label: "Maltesisch" },
+];
 
 function App() {
   const navigate = useNavigate();
@@ -363,11 +393,15 @@ function App() {
             </div>
             <div className="space-y-3">
               <h2 className="font-semibold">Caption-Sprache</h2>
-              <p className="text-sm text-muted-foreground">Welche Sprache soll im veröffentlichten Post-Text enthalten sein?</p>
-              <RadioGroup value={lang} onValueChange={(v) => setLang(v as Lang)} className="flex gap-4">
-                <div className="flex items-center gap-2"><RadioGroupItem value="de" id="l-de" /><Label htmlFor="l-de">Deutsch</Label></div>
-                <div className="flex items-center gap-2"><RadioGroupItem value="en" id="l-en" /><Label htmlFor="l-en">Englisch</Label></div>
-              </RadioGroup>
+              <p className="text-sm text-muted-foreground">Zielsprache für die übersetzten Posts (originale englische Captions bleiben gespeichert).</p>
+              <Select value={lang} onValueChange={(v) => setLang(v)}>
+                <SelectTrigger className="w-full sm:w-72"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={saveSettings}>Speichern</Button>
           </Card>
