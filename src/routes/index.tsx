@@ -430,7 +430,7 @@ function App() {
 
         {batches.length > 0 && (
           <section>
-            <h2 className="font-semibold mb-3">PDF-Uploads</h2>
+            <h2 className="font-semibold mb-3">PDF uploads</h2>
             <div className="grid gap-2">
               {batches.map((b) => (
                 <Card key={b.id} className="px-4 py-3 flex items-center justify-between">
@@ -439,7 +439,7 @@ function App() {
                     <div>
                       <div className="text-sm font-medium">{b.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(b.created_at).toLocaleString("de-DE")} · {b.status}
+                        {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
                         {b.error && ` · ${b.error}`}
                       </div>
                     </div>
@@ -453,11 +453,11 @@ function App() {
 
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Geplante Posts ({posts.length})</h2>
+            <h2 className="font-semibold">Scheduled posts ({posts.length})</h2>
           </div>
           {posts.length === 0 ? (
             <Card className="p-12 text-center text-muted-foreground">
-              Noch keine Posts. Lade eine PDF hoch um zu starten.
+              No posts yet. Upload a PDF to get started.
             </Card>
           ) : (
             <div className="grid gap-4">
