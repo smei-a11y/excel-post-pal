@@ -50,12 +50,14 @@ function App() {
     const [b, p, s] = await Promise.all([
       supabase.from("batches").select("*").order("created_at", { ascending: false }),
       supabase.from("posts").select("*, post_images(id, public_url, sort_order)").order("publish_at", { ascending: true }),
-      supabase.from("app_settings").select("webhook_url, caption_language").eq("id", 1).single(),
+      supabase.from("app_settings").select("webhook_url, caption_language, linkedin_access_token, linkedin_author_urn").eq("id", 1).single(),
     ]);
     if (b.data) setBatches(b.data as any);
     if (p.data) setPosts(p.data as any);
     if (s.data?.webhook_url) setWebhook(s.data.webhook_url);
     if ((s.data as any)?.caption_language) setLang((s.data as any).caption_language as Lang);
+    if ((s.data as any)?.linkedin_access_token) setLiToken((s.data as any).linkedin_access_token);
+    if ((s.data as any)?.linkedin_author_urn) setLiAuthor((s.data as any).linkedin_author_urn);
   }, []);
 
   useEffect(() => {
