@@ -393,11 +393,15 @@ function App() {
             </div>
             <div className="space-y-3">
               <h2 className="font-semibold">Caption-Sprache</h2>
-              <p className="text-sm text-muted-foreground">Welche Sprache soll im veröffentlichten Post-Text enthalten sein?</p>
-              <RadioGroup value={lang} onValueChange={(v) => setLang(v as Lang)} className="flex gap-4">
-                <div className="flex items-center gap-2"><RadioGroupItem value="de" id="l-de" /><Label htmlFor="l-de">Deutsch</Label></div>
-                <div className="flex items-center gap-2"><RadioGroupItem value="en" id="l-en" /><Label htmlFor="l-en">Englisch</Label></div>
-              </RadioGroup>
+              <p className="text-sm text-muted-foreground">Zielsprache für die übersetzten Posts (originale englische Captions bleiben gespeichert).</p>
+              <Select value={lang} onValueChange={(v) => setLang(v)}>
+                <SelectTrigger className="w-full sm:w-72"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {LANGUAGES.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <Button onClick={saveSettings}>Speichern</Button>
           </Card>
