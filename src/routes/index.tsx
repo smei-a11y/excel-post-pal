@@ -233,19 +233,16 @@ function App() {
       const { tusUpload } = await import("@/lib/tus-upload");
       await tusUpload({ file, bucket: "post-pdfs", path });
 
-      const { data: batch, error: bErr } = await supabase.from("batches").insert({
+      const { error: bErr } = await supabase.from("batches").insert({
         user_id: userId,
         name: file.name.replace(/\.pptx$/i, ""),
         source_filename: file.name,
         pdf_path: path,
-      }).select().single();
+        status: "queued",
+      });
       if (bErr) throw bErr;
 
-      toast.success("File uploaded — AI is now extracting the posts. This runs in the background.");
-      // Fire-and-forget: edge function processes asynchronously and returns 202 immediately
-      supabase.functions.invoke("extract-pdf", { body: { batchId: batch.id } }).catch((e) => {
-        console.error("invoke error", e);
-      });
+      toast.success("File uploaded — the worker will pick it up within a few seconds.");
       load();
     } catch (e: any) {
       toast.error("Upload error: " + (e?.message || e));
