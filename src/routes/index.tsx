@@ -41,6 +41,8 @@ function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [webhook, setWebhook] = useState("");
   const [lang, setLang] = useState<Lang>("de");
+  const [liToken, setLiToken] = useState("");
+  const [liAuthor, setLiAuthor] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
