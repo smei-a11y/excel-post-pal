@@ -185,7 +185,18 @@ function App() {
         body: { redirectUri, returnUrl: window.location.href },
       });
       if (error) throw error;
-      if (data?.authUrl) window.location.href = data.authUrl;
+      if (data?.authUrl) {
+        // Wenn die App im iframe läuft (Lovable Preview), neuen Tab öffnen,
+        // sonst Top-Level navigieren. LinkedIn blockiert iframe-Einbettung.
+        const inIframe = window.self !== window.top;
+        if (inIframe) {
+          window.open(data.authUrl, "_blank", "noopener,noreferrer");
+          toast.message("LinkedIn wurde in neuem Tab geöffnet. Nach dem Anmelden zurück hierher kommen.");
+          setLiConnecting(false);
+        } else {
+          window.location.href = data.authUrl;
+        }
+      }
     } catch (e: any) {
       toast.error("LinkedIn-Verbindung fehlgeschlagen: " + (e?.message || e));
       setLiConnecting(false);
