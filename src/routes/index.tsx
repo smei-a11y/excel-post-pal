@@ -458,7 +458,7 @@ function App() {
           </div>
           {posts.length === 0 ? (
             <Card className="p-12 text-center text-muted-foreground">
-              No posts yet. Upload a PDF to get started.
+              No posts yet. Upload a PPTX to get started.
             </Card>
           ) : (
             <div className="grid gap-4">
