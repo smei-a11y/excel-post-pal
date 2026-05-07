@@ -361,39 +361,39 @@ function App() {
         {showSettings && (
           <Card className="p-6 space-y-5">
             <div className="space-y-3">
-              <h2 className="font-semibold">LinkedIn-Verbindung</h2>
+              <h2 className="font-semibold">LinkedIn connection</h2>
               {liToken && liAuthor ? (
                 <div className="rounded-md border p-4 space-y-2">
                   <div className="text-sm">
-                    Verbunden als <span className="font-medium">{liConnectedName || liAuthor}</span>
+                    Connected as <span className="font-medium">{liConnectedName || liAuthor}</span>
                   </div>
                   {liExpiresAt && (
                     <div className="text-xs text-muted-foreground">
-                      Token gültig bis: {new Date(liExpiresAt).toLocaleString("de-DE")} (wird automatisch erneuert)
+                      Token valid until: {new Date(liExpiresAt).toLocaleString("en-US")} (refreshed automatically)
                     </div>
                   )}
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" variant="outline" onClick={connectLinkedIn} disabled={liConnecting}>
-                      Neu verbinden
+                      Reconnect
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={disconnectLinkedIn}>Trennen</Button>
+                    <Button size="sm" variant="ghost" onClick={disconnectLinkedIn}>Disconnect</Button>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-md border p-4 space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Verbinde dein LinkedIn-Konto per OAuth. Tokens werden automatisch erneuert.
+                    Connect your LinkedIn account via OAuth. Tokens are refreshed automatically.
                   </p>
                   <Button onClick={connectLinkedIn} disabled={liConnecting}>
                     {liConnecting ? <Loader2 className="animate-spin" /> : null}
-                    Mit LinkedIn verbinden
+                    Connect with LinkedIn
                   </Button>
                 </div>
               )}
             </div>
             <div className="space-y-3">
-              <h2 className="font-semibold">Caption-Sprache</h2>
-              <p className="text-sm text-muted-foreground">Zielsprache für die übersetzten Posts (originale englische Captions bleiben gespeichert).</p>
+              <h2 className="font-semibold">Caption language</h2>
+              <p className="text-sm text-muted-foreground">Target language for the translated posts (the original English captions are always kept).</p>
               <Select value={lang} onValueChange={(v) => setLang(v)}>
                 <SelectTrigger className="w-full sm:w-72"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -403,7 +403,7 @@ function App() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={saveSettings}>Speichern</Button>
+            <Button onClick={saveSettings}>Save</Button>
           </Card>
         )}
 
