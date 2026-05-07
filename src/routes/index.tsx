@@ -293,6 +293,20 @@ function App() {
           </Card>
         )}
 
+        <Card className="p-6 bg-accent/30 border-dashed">
+          <h2 className="font-semibold mb-3 flex items-center gap-2">
+            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">?</span>
+            So funktioniert's
+          </h2>
+          <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
+            <li><span className="text-foreground font-medium">LinkedIn verbinden:</span> Öffne <em>Einstellungen</em> oben rechts und klicke auf <em>Mit LinkedIn verbinden</em>. Im neuen Tab anmelden und Berechtigungen erteilen.</li>
+            <li><span className="text-foreground font-medium">Caption-Sprache wählen:</span> In den Einstellungen festlegen, ob Posts auf Deutsch, Englisch oder zweisprachig veröffentlicht werden.</li>
+            <li><span className="text-foreground font-medium">PDF hochladen:</span> Content-PDF unten per Drag &amp; Drop oder Auswahl hochladen. Die KI extrahiert Captions, Bilder, Datum, Uhrzeit und Hashtags und übersetzt automatisch.</li>
+            <li><span className="text-foreground font-medium">Posts prüfen &amp; bearbeiten:</span> Jeden Post unten kontrollieren, Text/CTA/Hashtags und Veröffentlichungszeitpunkt bei Bedarf anpassen.</li>
+            <li><span className="text-foreground font-medium">Veröffentlichen:</span> Posts werden zum geplanten Zeitpunkt automatisch publiziert — oder per <em>Jetzt senden</em> sofort.</li>
+          </ol>
+        </Card>
+
         <UploadZone uploading={uploading} onFile={onUpload} />
 
         {batches.length > 0 && (
