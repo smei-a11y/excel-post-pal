@@ -1,0 +1,67 @@
+# Knative Service Definition für Google Cloud Run
+# ============================================================
+# IMPORT-ANLEITUNG (kein Terminal nötig):
+#
+# 1. Öffne https://console.cloud.google.com/run
+# 2. Wähle dein Projekt aus (oder erstelle eins)
+# 3. Klicke oben auf "DIENST ERSTELLEN" / "CREATE SERVICE"
+# 4. Wähle "YAML bearbeiten" / "Edit YAML" (kleiner Link oben rechts)
+# 5. Kopiere den Inhalt dieser Datei rein
+# 6. Ersetze die 4 PLATZHALTER unten (siehe REPLACE_ME)
+# 7. Klicke "ERSTELLEN" / "CREATE"
+#
+# Container-Image wird automatisch aus dem worker/-Ordner gebaut?
+# → NEIN. YAML-Import braucht ein fertiges Image. Zwei Optionen:
+#
+#   OPTION A (einfachste): Cloud Shell nutzen
+#   ----------------------------------------
+#   Klick oben rechts auf das ">_" Icon (Cloud Shell aktivieren)
+#   Dann ausführen:
+#     git clone <dein-repo> && cd worker
+#     gcloud builds submit --tag gcr.io/PROJECT_ID/pptx-worker
+#   Image-Pfad oben unter "image:" eintragen.
+#
+#   OPTION B: Diesen YAML als Vorlage nehmen, dann via
+#   "Cloud Run → Quellcode bereitstellen" den worker/-Ordner hochladen
+#   und die Settings unten manuell übernehmen.
+# ============================================================
+
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: pptx-worker
+  annotations:
+    run.googleapis.com/launch-stage: GA
+spec:
+  template:
+    metadata:
+      annotations:
+        # Skaliert auf 0 wenn keine Requests → spart Geld
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "3"
+        # Eine PPTX pro Container, keine Parallelität
+        run.googleapis.com/cpu-throttling: "false"
+    spec:
+      # Max 60 Min pro Request (für riesige PPTX)
+      timeoutSeconds: 3600
+      containerConcurrency: 1
+      containers:
+        - image: REPLACE_ME_IMAGE_URL  # z.B. gcr.io/dein-projekt/pptx-worker:latest
+          ports:
+            - containerPort: 8080
+          resources:
+            limits:
+              cpu: "2"
+              memory: 2Gi
+          env:
+            - name: SUPABASE_URL
+              value: "https://kbcqvqfnavkagdngapff.supabase.co"
+            - name: SUPABASE_SERVICE_ROLE_KEY
+              value: "REPLACE_ME_SERVICE_ROLE_KEY"
+            - name: LOVABLE_API_KEY
+              value: "REPLACE_ME_LOVABLE_API_KEY"
+            - name: WORKER_SHARED_SECRET
+              value: "REPLACE_ME_GENERATE_RANDOM_64_CHARS"
+  traffic:
+    - percent: 100
+      latestRevision: true
