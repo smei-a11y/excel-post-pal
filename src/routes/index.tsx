@@ -490,13 +490,13 @@ function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: Fil
           {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
         </div>
         <div>
-          <h3 className="font-medium">Neue Content-PDF hochladen</h3>
-          <p className="text-sm text-muted-foreground">KI extrahiert Captions, Datum, Uhrzeit, Hashtags und übersetzt automatisch ins Deutsche.</p>
+          <h3 className="font-medium">Upload a new content PDF</h3>
+          <p className="text-sm text-muted-foreground">AI extracts captions, date, time and hashtags and translates automatically.</p>
         </div>
         <label>
           <input type="file" accept="application/pdf" className="hidden" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-          <Button asChild disabled={uploading}><span>{uploading ? "Wird verarbeitet..." : "PDF auswählen"}</span></Button>
+          <Button asChild disabled={uploading}><span>{uploading ? "Processing..." : "Choose PDF"}</span></Button>
         </label>
       </div>
     </Card>
