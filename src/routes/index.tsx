@@ -217,8 +217,8 @@ function App() {
   const onUpload = async (file: File) => {
     if (!userId) return;
     const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".pdf") && !lower.endsWith(".pptx")) {
-      toast.error("Please upload a PDF or PPTX file");
+    if (!lower.endsWith(".pptx")) {
+      toast.error("Please upload a PPTX file");
       return;
     }
     setUploading(true);
@@ -228,7 +228,7 @@ function App() {
       if (upErr) throw upErr;
       const { data: batch, error: bErr } = await supabase.from("batches").insert({
         user_id: userId,
-        name: file.name.replace(/\.pdf$/i, ""),
+        name: file.name.replace(/\.pptx$/i, ""),
         source_filename: file.name,
         pdf_path: path,
       }).select().single();
