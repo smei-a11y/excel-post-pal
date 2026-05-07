@@ -233,17 +233,22 @@ function App() {
       const { tusUpload } = await import("@/lib/tus-upload");
       await tusUpload({ file, bucket: "post-pdfs", path });
 
-      const { error: bErr } = await supabase.from("batches").insert({
+      const { data: inserted, error: bErr } = await supabase.from("batches").insert({
         user_id: userId,
         name: file.name.replace(/\.pptx$/i, ""),
         source_filename: file.name,
         pdf_path: path,
         status: "queued",
-      });
+      }).select().single();
       if (bErr) throw bErr;
 
-      toast.success("File uploaded — the worker will pick it up within a few seconds.");
+      // Trigger the external worker (Cloud Run / Render / etc.) — fire-and-forget
+      supabase.functions.invoke("trigger-worker", { body: { batchId: inserted.id } })
+        .catch((e) => console.error("trigger-worker error", e));
+
+      toast.success("File uploaded — processing has started.");
       load();
+
     } catch (e: any) {
       toast.error("Upload error: " + (e?.message || e));
     } finally {
