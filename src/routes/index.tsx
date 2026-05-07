@@ -155,9 +155,26 @@ function App() {
         {showSettings && (
           <Card className="p-6 space-y-5">
             <div className="space-y-3">
-              <h2 className="font-semibold">Webhook-URL (Make / Zapier / n8n)</h2>
+              <h2 className="font-semibold">LinkedIn — Direktveröffentlichung</h2>
               <p className="text-sm text-muted-foreground">
-                Geplante Posts werden zur eingestellten Zeit per POST an diese URL gesendet (mit Text, Hashtags, Bildern, Link).
+                Posts werden direkt aus dieser App an LinkedIn gesendet (kein Make/Zapier nötig). Du brauchst einen Access Token mit Scope <code>w_member_social</code> (persönliches Profil) oder <code>w_organization_social</code> (Firmen-Seite) und den Author-URN.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="li-token" className="text-xs">Access Token</Label>
+                <Input id="li-token" type="password" value={liToken} onChange={(e) => setLiToken(e.target.value)} placeholder="AQX..." />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="li-author" className="text-xs">Author URN</Label>
+                <Input id="li-author" value={liAuthor} onChange={(e) => setLiAuthor(e.target.value)} placeholder="urn:li:person:XXXX  oder  urn:li:organization:12345" />
+                <p className="text-xs text-muted-foreground">
+                  Persönliches Profil: <code>urn:li:person:&lt;Mitglieds-ID&gt;</code> · Firmen-Seite: <code>urn:li:organization:&lt;Firmen-ID&gt;</code>
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3 opacity-60">
+              <h2 className="font-semibold text-sm">Webhook-URL (optional / Legacy)</h2>
+              <p className="text-xs text-muted-foreground">
+                Wird nicht mehr verwendet. Veröffentlichung läuft jetzt direkt über LinkedIn.
               </p>
               <Input value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://hooks.zapier.com/..." />
             </div>
