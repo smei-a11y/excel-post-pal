@@ -47,6 +47,9 @@ function App() {
   const [lang, setLang] = useState<Lang>("de");
   const [liToken, setLiToken] = useState("");
   const [liAuthor, setLiAuthor] = useState("");
+  const [liConnectedName, setLiConnectedName] = useState<string>("");
+  const [liExpiresAt, setLiExpiresAt] = useState<string | null>(null);
+  const [liConnecting, setLiConnecting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -78,13 +81,15 @@ function App() {
     const [b, p, s] = await Promise.all([
       supabase.from("batches").select("*").order("created_at", { ascending: false }),
       supabase.from("posts").select("*, post_images(id, public_url, sort_order)").order("publish_at", { ascending: true }),
-      supabase.from("app_settings").select("caption_language, linkedin_access_token, linkedin_author_urn").eq("user_id", userId).maybeSingle(),
+      supabase.from("app_settings").select("caption_language, linkedin_access_token, linkedin_author_urn, linkedin_connected_name, linkedin_token_expires_at").eq("user_id", userId).maybeSingle(),
     ]);
     if (b.data) setBatches(b.data as any);
     if (p.data) setPosts(p.data as any);
     if (s.data?.caption_language) setLang(s.data.caption_language as Lang);
     if (s.data?.linkedin_access_token) setLiToken(s.data.linkedin_access_token);
     if (s.data?.linkedin_author_urn) setLiAuthor(s.data.linkedin_author_urn);
+    setLiConnectedName((s.data as any)?.linkedin_connected_name || "");
+    setLiExpiresAt((s.data as any)?.linkedin_token_expires_at || null);
   }, [userId]);
 
   useEffect(() => {
@@ -172,6 +177,35 @@ function App() {
     navigate({ to: "/login" });
   };
 
+  const connectLinkedIn = async () => {
+    setLiConnecting(true);
+    try {
+      const redirectUri = window.location.origin + "/linkedin-callback";
+      const { data, error } = await supabase.functions.invoke("linkedin-oauth-start", {
+        body: { redirectUri, returnUrl: window.location.href },
+      });
+      if (error) throw error;
+      if (data?.authUrl) window.location.href = data.authUrl;
+    } catch (e: any) {
+      toast.error("LinkedIn-Verbindung fehlgeschlagen: " + (e?.message || e));
+      setLiConnecting(false);
+    }
+  };
+
+  const disconnectLinkedIn = async () => {
+    if (!userId) return;
+    await supabase.from("app_settings").update({
+      linkedin_access_token: null,
+      linkedin_refresh_token: null,
+      linkedin_token_expires_at: null,
+      linkedin_refresh_expires_at: null,
+      linkedin_author_urn: null,
+      linkedin_connected_name: null,
+    }).eq("user_id", userId);
+    setLiToken(""); setLiAuthor(""); setLiConnectedName(""); setLiExpiresAt(null);
+    toast.success("LinkedIn getrennt");
+  };
+
   if (!authReady || !userId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -205,21 +239,35 @@ function App() {
         {showSettings && (
           <Card className="p-6 space-y-5">
             <div className="space-y-3">
-              <h2 className="font-semibold">LinkedIn — Direktveröffentlichung</h2>
-              <p className="text-sm text-muted-foreground">
-                Posts werden direkt aus dieser App an LinkedIn gesendet. Du brauchst einen Access Token mit Scope <code>w_member_social</code> (persönliches Profil) oder <code>w_organization_social</code> (Firmen-Seite) und den Author-URN.
-              </p>
-              <div className="space-y-2">
-                <Label htmlFor="li-token" className="text-xs">Access Token</Label>
-                <Input id="li-token" type="password" value={liToken} onChange={(e) => setLiToken(e.target.value)} placeholder="AQX..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="li-author" className="text-xs">Author URN</Label>
-                <Input id="li-author" value={liAuthor} onChange={(e) => setLiAuthor(e.target.value)} placeholder="urn:li:person:XXXX  oder  urn:li:organization:12345" />
-                <p className="text-xs text-muted-foreground">
-                  Persönliches Profil: <code>urn:li:person:&lt;Mitglieds-ID&gt;</code> · Firmen-Seite: <code>urn:li:organization:&lt;Firmen-ID&gt;</code>
-                </p>
-              </div>
+              <h2 className="font-semibold">LinkedIn-Verbindung</h2>
+              {liToken && liAuthor ? (
+                <div className="rounded-md border p-4 space-y-2">
+                  <div className="text-sm">
+                    Verbunden als <span className="font-medium">{liConnectedName || liAuthor}</span>
+                  </div>
+                  {liExpiresAt && (
+                    <div className="text-xs text-muted-foreground">
+                      Token gültig bis: {new Date(liExpiresAt).toLocaleString("de-DE")} (wird automatisch erneuert)
+                    </div>
+                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="outline" onClick={connectLinkedIn} disabled={liConnecting}>
+                      Neu verbinden
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={disconnectLinkedIn}>Trennen</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-md border p-4 space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Verbinde dein LinkedIn-Konto per OAuth. Tokens werden automatisch erneuert.
+                  </p>
+                  <Button onClick={connectLinkedIn} disabled={liConnecting}>
+                    {liConnecting ? <Loader2 className="animate-spin" /> : null}
+                    Mit LinkedIn verbinden
+                  </Button>
+                </div>
+              )}
             </div>
             <div className="space-y-3">
               <h2 className="font-semibold">Caption-Sprache</h2>
