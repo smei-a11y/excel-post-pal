@@ -523,8 +523,8 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
   };
 
   const images = (post.post_images || []).slice().sort((a, b) => a.sort_order - b.sort_order);
-  const showDe = lang === "de" || lang === "both";
-  const showEn = lang === "en" || lang === "both";
+  const showTranslated = lang !== "en";
+  const showOriginal = lang === "en" || lang === "both";
 
   return (
     <Card className="p-5 space-y-3">
