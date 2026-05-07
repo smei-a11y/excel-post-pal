@@ -32,10 +32,18 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
+
+    // Resolve calling user from JWT for ownership stamping
+    const authHeader = req.headers.get("Authorization") || "";
+    const jwt = authHeader.replace(/^Bearer\s+/i, "");
+    const { data: userRes } = await supabase.auth.getUser(jwt);
+    const userId = userRes?.user?.id;
+    if (!userId) throw new Error("Nicht authentifiziert");
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not set");
 
-    const { data: batch, error: bErr } = await supabase.from("batches").select("*").eq("id", batchId).single();
+    const { data: batch, error: bErr } = await supabase.from("batches").select("*").eq("id", batchId).eq("user_id", userId).single();
     if (bErr || !batch) throw new Error("batch not found");
 
     const { data: pdfBlob, error: dlErr } = await supabase.storage.from("post-pdfs").download(batch.pdf_path);
@@ -127,6 +135,7 @@ Gib für jeden Post zurück:
 
     for (const p of args.posts) {
       const { data: row, error } = await supabase.from("posts").insert({
+        user_id: userId,
         batch_id: batchId,
         position: p.position,
         focus: p.focus,
@@ -145,7 +154,7 @@ Gib für jeden Post zurück:
       try {
         const images = await extractPageImages(doc, pageIdx);
         for (let i = 0; i < images.length; i++) {
-          const path = `${batchId}/${row.id}/${i}.png`;
+          const path = `${userId}/${batchId}/${row.id}/${i}.png`;
           const { error: upErr } = await supabase.storage.from("post-images").upload(path, images[i], {
             contentType: "image/png",
             upsert: true,
@@ -153,6 +162,7 @@ Gib für jeden Post zurück:
           if (upErr) { console.error("upload err", upErr); continue; }
           const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
           await supabase.from("post_images").insert({
+            user_id: userId,
             post_id: row.id,
             storage_path: path,
             public_url: pub.publicUrl,

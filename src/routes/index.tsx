@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast, Toaster } from "sonner";
-import { Calendar, Upload, Send, Settings as SettingsIcon, Loader2, Trash2, CheckCircle2, AlertCircle, Clock, ImageIcon } from "lucide-react";
+import { Calendar, Upload, Send, Settings as SettingsIcon, Loader2, Trash2, CheckCircle2, AlertCircle, Clock, ImageIcon, LogOut } from "lucide-react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 
@@ -37,50 +37,80 @@ type Batch = { id: string; name: string; status: string; error: string | null; c
 type Lang = "de" | "en" | "both";
 
 function App() {
+  const navigate = useNavigate();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [authReady, setAuthReady] = useState(false);
+
   const [batches, setBatches] = useState<Batch[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [webhook, setWebhook] = useState("");
   const [lang, setLang] = useState<Lang>("de");
   const [liToken, setLiToken] = useState("");
   const [liAuthor, setLiAuthor] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
+  // Auth gate
+  useEffect(() => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      if (!session) {
+        setUserId(null);
+        navigate({ to: "/login" });
+      } else {
+        setUserId(session.user.id);
+        setUserEmail(session.user.email || "");
+      }
+      setAuthReady(true);
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (!data.session) navigate({ to: "/login" });
+      else {
+        setUserId(data.session.user.id);
+        setUserEmail(data.session.user.email || "");
+      }
+      setAuthReady(true);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, [navigate]);
+
   const load = useCallback(async () => {
+    if (!userId) return;
     const [b, p, s] = await Promise.all([
       supabase.from("batches").select("*").order("created_at", { ascending: false }),
       supabase.from("posts").select("*, post_images(id, public_url, sort_order)").order("publish_at", { ascending: true }),
-      supabase.from("app_settings").select("webhook_url, caption_language, linkedin_access_token, linkedin_author_urn").eq("id", 1).single(),
+      supabase.from("app_settings").select("caption_language, linkedin_access_token, linkedin_author_urn").eq("user_id", userId).maybeSingle(),
     ]);
     if (b.data) setBatches(b.data as any);
     if (p.data) setPosts(p.data as any);
-    if (s.data?.webhook_url) setWebhook(s.data.webhook_url);
-    if ((s.data as any)?.caption_language) setLang((s.data as any).caption_language as Lang);
-    if ((s.data as any)?.linkedin_access_token) setLiToken((s.data as any).linkedin_access_token);
-    if ((s.data as any)?.linkedin_author_urn) setLiAuthor((s.data as any).linkedin_author_urn);
-  }, []);
+    if (s.data?.caption_language) setLang(s.data.caption_language as Lang);
+    if (s.data?.linkedin_access_token) setLiToken(s.data.linkedin_access_token);
+    if (s.data?.linkedin_author_urn) setLiAuthor(s.data.linkedin_author_urn);
+  }, [userId]);
 
   useEffect(() => {
+    if (!userId) return;
     load();
     const ch = supabase
       .channel("rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "batches" }, load)
-      .on("postgres_changes", { event: "*", schema: "public", table: "posts" }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "batches", filter: `user_id=eq.${userId}` }, load)
+      .on("postgres_changes", { event: "*", schema: "public", table: "posts", filter: `user_id=eq.${userId}` }, load)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [load]);
+  }, [load, userId]);
 
   const onUpload = async (file: File) => {
+    if (!userId) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) {
       toast.error("Bitte eine PDF-Datei hochladen");
       return;
     }
     setUploading(true);
     try {
-      const path = `${crypto.randomUUID()}-${file.name}`;
+      const path = `${userId}/${crypto.randomUUID()}-${file.name}`;
       const { error: upErr } = await supabase.storage.from("post-pdfs").upload(path, file);
       if (upErr) throw upErr;
       const { data: batch, error: bErr } = await supabase.from("batches").insert({
+        user_id: userId,
         name: file.name.replace(/\.pdf$/i, ""),
         source_filename: file.name,
         pdf_path: path,
@@ -99,13 +129,14 @@ function App() {
   };
 
   const saveSettings = async () => {
-    const { error } = await supabase.from("app_settings").update({
-      webhook_url: webhook,
+    if (!userId) return;
+    const { error } = await supabase.from("app_settings").upsert({
+      user_id: userId,
       caption_language: lang,
       linkedin_access_token: liToken || null,
       linkedin_author_urn: liAuthor || null,
       updated_at: new Date().toISOString(),
-    }).eq("id", 1);
+    }, { onConflict: "user_id" });
     if (error) toast.error(error.message);
     else toast.success("Einstellungen gespeichert");
   };
@@ -136,6 +167,19 @@ function App() {
     else load();
   };
 
+  const logout = async () => {
+    await supabase.auth.signOut();
+    navigate({ to: "/login" });
+  };
+
+  if (!authReady || !userId) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Toaster richColors position="top-right" />
@@ -145,9 +189,15 @@ function App() {
             <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planer</h1>
             <p className="text-sm text-muted-foreground">PDF hochladen · Automatisch übersetzen · Geplant veröffentlichen</p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setShowSettings((s) => !s)}>
-            <SettingsIcon /> Einstellungen
-          </Button>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground hidden sm:inline">{userEmail}</span>
+            <Button variant="outline" size="sm" onClick={() => setShowSettings((s) => !s)}>
+              <SettingsIcon /> Einstellungen
+            </Button>
+            <Button variant="ghost" size="sm" onClick={logout}>
+              <LogOut />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -157,7 +207,7 @@ function App() {
             <div className="space-y-3">
               <h2 className="font-semibold">LinkedIn — Direktveröffentlichung</h2>
               <p className="text-sm text-muted-foreground">
-                Posts werden direkt aus dieser App an LinkedIn gesendet (kein Make/Zapier nötig). Du brauchst einen Access Token mit Scope <code>w_member_social</code> (persönliches Profil) oder <code>w_organization_social</code> (Firmen-Seite) und den Author-URN.
+                Posts werden direkt aus dieser App an LinkedIn gesendet. Du brauchst einen Access Token mit Scope <code>w_member_social</code> (persönliches Profil) oder <code>w_organization_social</code> (Firmen-Seite) und den Author-URN.
               </p>
               <div className="space-y-2">
                 <Label htmlFor="li-token" className="text-xs">Access Token</Label>
@@ -170,13 +220,6 @@ function App() {
                   Persönliches Profil: <code>urn:li:person:&lt;Mitglieds-ID&gt;</code> · Firmen-Seite: <code>urn:li:organization:&lt;Firmen-ID&gt;</code>
                 </p>
               </div>
-            </div>
-            <div className="space-y-3 opacity-60">
-              <h2 className="font-semibold text-sm">Webhook-URL (optional / Legacy)</h2>
-              <p className="text-xs text-muted-foreground">
-                Wird nicht mehr verwendet. Veröffentlichung läuft jetzt direkt über LinkedIn.
-              </p>
-              <Input value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://hooks.zapier.com/..." />
             </div>
             <div className="space-y-3">
               <h2 className="font-semibold">Caption-Sprache</h2>

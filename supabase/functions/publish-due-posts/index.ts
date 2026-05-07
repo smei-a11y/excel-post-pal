@@ -140,26 +140,31 @@ Deno.serve(async (req) => {
       : await q.lte("publish_at", new Date().toISOString());
     if (error) throw error;
 
-    const { data: settings } = await supabase
-      .from("app_settings")
-      .select("caption_language, linkedin_access_token, linkedin_author_urn")
-      .eq("id", 1)
-      .single();
-
-    const lang = (settings?.caption_language || "de") as Lang;
-    const token = settings?.linkedin_access_token;
-    const author = settings?.linkedin_author_urn;
-
-    if (!token || !author) {
-      return new Response(
-        JSON.stringify({ error: "LinkedIn nicht konfiguriert: Access Token und Author URN in Einstellungen hinterlegen." }),
-        { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
-      );
+    // Cache settings per user
+    const settingsCache = new Map<string, { lang: Lang; token: string; author: string }>();
+    async function getSettings(uid: string) {
+      if (settingsCache.has(uid)) return settingsCache.get(uid)!;
+      const { data: s } = await supabase
+        .from("app_settings")
+        .select("caption_language, linkedin_access_token, linkedin_author_urn")
+        .eq("user_id", uid)
+        .maybeSingle();
+      const v = {
+        lang: ((s?.caption_language || "de") as Lang),
+        token: s?.linkedin_access_token || "",
+        author: s?.linkedin_author_urn || "",
+      };
+      settingsCache.set(uid, v);
+      return v;
     }
 
     const results: any[] = [];
     for (const post of posts || []) {
       try {
+        if (!post.user_id) throw new Error("Post hat keinen Owner");
+        const { lang, token, author } = await getSettings(post.user_id);
+        if (!token || !author) throw new Error("LinkedIn nicht konfiguriert (Access Token / Author URN fehlt)");
+
         const images: string[] = (post.post_images || [])
           .sort((a: any, b: any) => a.sort_order - b.sort_order)
           .map((i: any) => i.public_url)
@@ -171,7 +176,6 @@ Deno.serve(async (req) => {
         const body = lang === "en" ? en : lang === "both" ? `${de}\n\n— — —\n\n${en}` : de;
         const commentary = escapeCommentary(`${body}\n\n${tagLine}\n\n${post.link_url || ""}`.trim());
 
-        // Detect video by extension
         const isVideo = (url: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url);
         const hasVideo = images.some(isVideo);
 
@@ -185,9 +189,7 @@ Deno.serve(async (req) => {
           content = { media: { id: imageUrn } };
         } else if (images.length > 1) {
           const urns: string[] = [];
-          for (const url of images) {
-            urns.push(await uploadImage(token, author, url));
-          }
+          for (const url of images) urns.push(await uploadImage(token, author, url));
           content = { multiImage: { images: urns.map((id) => ({ id })) } };
         }
 
