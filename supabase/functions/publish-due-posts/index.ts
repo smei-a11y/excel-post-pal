@@ -5,7 +5,7 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const LI_VERSION = "202405";
+const LI_VERSION = "202509";
 
 type Lang = "de" | "en" | "both";
 
