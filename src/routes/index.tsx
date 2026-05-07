@@ -297,19 +297,19 @@ function App() {
       });
       if (error) throw error;
       if (data?.authUrl) {
-        // Wenn die App im iframe läuft (Lovable Preview), neuen Tab öffnen,
-        // sonst Top-Level navigieren. LinkedIn blockiert iframe-Einbettung.
+        // If the app runs inside an iframe (Lovable preview), open a new tab,
+        // otherwise navigate at top level. LinkedIn blocks iframe embedding.
         const inIframe = window.self !== window.top;
         if (inIframe) {
           window.open(data.authUrl, "_blank", "noopener,noreferrer");
-          toast.message("LinkedIn wurde in neuem Tab geöffnet. Nach dem Anmelden zurück hierher kommen.");
+          toast.message("LinkedIn opened in a new tab. Come back here after signing in.");
           setLiConnecting(false);
         } else {
           window.location.href = data.authUrl;
         }
       }
     } catch (e: any) {
-      toast.error("LinkedIn-Verbindung fehlgeschlagen: " + (e?.message || e));
+      toast.error("LinkedIn connection failed: " + (e?.message || e));
       setLiConnecting(false);
     }
   };
