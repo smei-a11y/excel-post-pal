@@ -31,10 +31,9 @@ const LANG_NAMES: Record<string, string> = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-  let batchId: string | undefined;
   try {
     const body = await req.json();
-    batchId = body?.batchId;
+    const batchId: string | undefined = body?.batchId;
     if (!batchId) throw new Error("batchId required");
 
     const supabase = createClient(
@@ -48,93 +47,109 @@ Deno.serve(async (req) => {
     const userId = userRes?.user?.id;
     if (!userId) throw new Error("Nicht authentifiziert");
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not set");
+    // Mark batch as processing immediately so the UI can react
+    await supabase.from("batches").update({ status: "processing", error: null }).eq("id", batchId).eq("user_id", userId);
 
-    const { data: batch, error: bErr } = await supabase.from("batches").select("*").eq("id", batchId).eq("user_id", userId).single();
-    if (bErr || !batch) throw new Error("batch not found");
+    // Run heavy work in the background — return 202 immediately
+    // @ts-ignore EdgeRuntime is available in Supabase Edge Functions
+    EdgeRuntime.waitUntil(processBatch(batchId, userId).catch(async (e) => {
+      console.error("background processing failed", e);
+      const msg = e instanceof Error ? e.message : String(e);
+      try {
+        await supabase.from("batches").update({ status: "error", error: msg }).eq("id", batchId);
+      } catch {}
+    }));
 
-    const { data: settings } = await supabase
-      .from("app_settings").select("caption_language").eq("user_id", userId).maybeSingle();
-    const rawLang = (settings?.caption_language || "de") as string;
-    const targetCode = rawLang === "both" ? "de" : (rawLang === "en" ? "en" : rawLang);
-    const targetLangName = LANG_NAMES[targetCode] || "Deutsch";
-
-    const { data: fileBlob, error: dlErr } = await supabase.storage.from("post-pdfs").download(batch.pdf_path);
-    if (dlErr || !fileBlob) throw new Error("file download failed: " + dlErr?.message);
-    const fileBuf = new Uint8Array(await fileBlob.arrayBuffer());
-
-    const filename = (batch.source_filename || batch.pdf_path || "").toLowerCase();
-    const isPptx = filename.endsWith(".pptx") || filename.endsWith(".ppt");
-
-    let posts: ExtractedPost[];
-    let mediaPerPage: Map<number, Array<{ bytes: Uint8Array; ext: string; contentType: string }>>;
-
-    if (isPptx) {
-      const r = await extractFromPptx(fileBuf, targetLangName, targetCode, LOVABLE_API_KEY);
-      posts = r.posts;
-      mediaPerPage = r.mediaPerPage;
-    } else {
-      const r = await extractFromPdf(fileBuf, batch.source_filename || "content.pdf", targetLangName, targetCode, LOVABLE_API_KEY);
-      posts = r.posts;
-      mediaPerPage = r.mediaPerPage;
-    }
-
-    for (const p of posts) {
-      const { data: row, error } = await supabase.from("posts").insert({
-        user_id: userId,
-        batch_id: batchId,
-        position: p.position,
-        focus: p.focus,
-        format: p.format,
-        original_caption: p.caption,
-        original_cta: p.cta,
-        translated_caption: p.translated_caption,
-        translated_cta: p.translated_cta,
-        hashtags: p.hashtags,
-        link_url: p.link_url,
-        publish_at: p.publish_at,
-      }).select().single();
-      if (error || !row) { console.error("insert error", error); continue; }
-
-      const media = mediaPerPage.get(p.pdf_page) || [];
-      for (let i = 0; i < media.length; i++) {
-        const m = media[i];
-        const path = `${userId}/${batchId}/${row.id}/${i}.${m.ext}`;
-        const { error: upErr } = await supabase.storage.from("post-images").upload(path, m.bytes, {
-          contentType: m.contentType,
-          upsert: true,
-        });
-        if (upErr) { console.error("upload err", upErr); continue; }
-        const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
-        await supabase.from("post_images").insert({
-          user_id: userId,
-          post_id: row.id,
-          storage_path: path,
-          public_url: pub.publicUrl,
-          sort_order: i,
-        });
-      }
-    }
-
-    await supabase.from("batches").update({ status: "ready" }).eq("id", batchId);
-    return new Response(JSON.stringify({ success: true, count: posts.length }), {
+    return new Response(JSON.stringify({ accepted: true, batchId }), {
+      status: 202,
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error(e);
     const msg = e instanceof Error ? e.message : String(e);
-    if (batchId) {
-      try {
-        const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-        await supabase.from("batches").update({ status: "error", error: msg }).eq("id", batchId);
-      } catch {}
-    }
     return new Response(JSON.stringify({ error: msg }), {
       status: 500, headers: { ...cors, "Content-Type": "application/json" },
     });
   }
 });
+
+async function processBatch(batchId: string, userId: string) {
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not set");
+
+  const { data: batch, error: bErr } = await supabase.from("batches").select("*").eq("id", batchId).eq("user_id", userId).single();
+  if (bErr || !batch) throw new Error("batch not found");
+
+  const { data: settings } = await supabase
+    .from("app_settings").select("caption_language").eq("user_id", userId).maybeSingle();
+  const rawLang = (settings?.caption_language || "de") as string;
+  const targetCode = rawLang === "both" ? "de" : (rawLang === "en" ? "en" : rawLang);
+  const targetLangName = LANG_NAMES[targetCode] || "Deutsch";
+
+  const { data: fileBlob, error: dlErr } = await supabase.storage.from("post-pdfs").download(batch.pdf_path);
+  if (dlErr || !fileBlob) throw new Error("file download failed: " + dlErr?.message);
+  const fileBuf = new Uint8Array(await fileBlob.arrayBuffer());
+
+  const filename = (batch.source_filename || batch.pdf_path || "").toLowerCase();
+  const isPptx = filename.endsWith(".pptx") || filename.endsWith(".ppt");
+
+  let posts: ExtractedPost[];
+  let mediaPerPage: Map<number, Array<{ bytes: Uint8Array; ext: string; contentType: string }>>;
+
+  if (isPptx) {
+    const r = await extractFromPptx(fileBuf, targetLangName, targetCode, LOVABLE_API_KEY);
+    posts = r.posts;
+    mediaPerPage = r.mediaPerPage;
+  } else {
+    const r = await extractFromPdf(fileBuf, batch.source_filename || "content.pdf", targetLangName, targetCode, LOVABLE_API_KEY);
+    posts = r.posts;
+    mediaPerPage = r.mediaPerPage;
+  }
+
+  for (const p of posts) {
+    const { data: row, error } = await supabase.from("posts").insert({
+      user_id: userId,
+      batch_id: batchId,
+      position: p.position,
+      focus: p.focus,
+      format: p.format,
+      original_caption: p.caption,
+      original_cta: p.cta,
+      translated_caption: p.translated_caption,
+      translated_cta: p.translated_cta,
+      hashtags: p.hashtags,
+      link_url: p.link_url,
+      publish_at: p.publish_at,
+    }).select().single();
+    if (error || !row) { console.error("insert error", error); continue; }
+
+    const media = mediaPerPage.get(p.pdf_page) || [];
+    for (let i = 0; i < media.length; i++) {
+      const m = media[i];
+      const path = `${userId}/${batchId}/${row.id}/${i}.${m.ext}`;
+      const { error: upErr } = await supabase.storage.from("post-images").upload(path, m.bytes, {
+        contentType: m.contentType,
+        upsert: true,
+      });
+      if (upErr) { console.error("upload err", upErr); continue; }
+      const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
+      await supabase.from("post_images").insert({
+        user_id: userId,
+        post_id: row.id,
+        storage_path: path,
+        public_url: pub.publicUrl,
+        sort_order: i,
+      });
+    }
+  }
+
+  await supabase.from("batches").update({ status: "ready" }).eq("id", batchId);
+}
 
 // ---------- PDF branch (unchanged behaviour) ----------
 async function extractFromPdf(pdfBuf: Uint8Array, filename: string, targetLangName: string, targetCode: string, apiKey: string) {

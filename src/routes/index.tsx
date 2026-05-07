@@ -220,11 +220,19 @@ function App() {
       toast.error("Please upload a PPTX file");
       return;
     }
+    const MAX_BYTES = 1024 * 1024 * 1024; // 1 GB
+    if (file.size > MAX_BYTES) {
+      toast.error("File too large — maximum is 1 GB");
+      return;
+    }
     setUploading(true);
     try {
       const path = `${userId}/${crypto.randomUUID()}-${file.name}`;
-      const { error: upErr } = await supabase.storage.from("post-pdfs").upload(path, file);
-      if (upErr) throw upErr;
+
+      // Resumable (TUS) upload — works for very large files (up to 1 GB here)
+      const { tusUpload } = await import("@/lib/tus-upload");
+      await tusUpload({ file, bucket: "post-pdfs", path });
+
       const { data: batch, error: bErr } = await supabase.from("batches").insert({
         user_id: userId,
         name: file.name.replace(/\.pptx$/i, ""),
@@ -232,13 +240,15 @@ function App() {
         pdf_path: path,
       }).select().single();
       if (bErr) throw bErr;
-      toast.success("File uploaded — AI is now extracting the posts...");
-      const { error: fnErr } = await supabase.functions.invoke("extract-pdf", { body: { batchId: batch.id } });
-      if (fnErr) throw fnErr;
-      toast.success("Posts extracted and translated!");
+
+      toast.success("File uploaded — AI is now extracting the posts. This runs in the background.");
+      // Fire-and-forget: edge function processes asynchronously and returns 202 immediately
+      supabase.functions.invoke("extract-pdf", { body: { batchId: batch.id } }).catch((e) => {
+        console.error("invoke error", e);
+      });
       load();
     } catch (e: any) {
-      toast.error("Error: " + (e?.message || e));
+      toast.error("Upload error: " + (e?.message || e));
     } finally {
       setUploading(false);
     }
