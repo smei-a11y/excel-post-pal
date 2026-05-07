@@ -619,9 +619,9 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    scheduled: { label: "Geplant", cls: "bg-accent text-accent-foreground" },
-    published: { label: "Veröffentlicht", cls: "bg-success text-success-foreground" },
-    failed: { label: "Fehler", cls: "bg-destructive text-destructive-foreground" },
+    scheduled: { label: "Scheduled", cls: "bg-accent text-accent-foreground" },
+    published: { label: "Published", cls: "bg-success text-success-foreground" },
+    failed: { label: "Failed", cls: "bg-destructive text-destructive-foreground" },
   };
   const m = map[status] || { label: status, cls: "bg-muted" };
   return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.cls}`}>{m.label}</span>;
