@@ -5,38 +5,120 @@ const cors = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const TIMEOUT_MS = 30_000;
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 5_000;
+const LI_VERSION = "202405";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+type Lang = "de" | "en" | "both";
 
-async function postWithRetry(url: string, payload: unknown) {
-  let lastErr = "";
-  let lastStatus = 0;
-  let lastBody = "";
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    try {
-      const r = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        signal: ctrl.signal,
-      });
-      clearTimeout(timer);
-      lastStatus = r.status;
-      lastBody = await r.text();
-      if (r.ok) return { ok: true, status: r.status, body: lastBody };
-      lastErr = `HTTP ${r.status}: ${lastBody.slice(0, 300)}`;
-    } catch (e) {
-      clearTimeout(timer);
-      lastErr = e instanceof Error ? e.message : String(e);
-    }
-    if (attempt < MAX_RETRIES) await sleep(RETRY_DELAY_MS);
+async function liFetch(path: string, token: string, init: RequestInit = {}) {
+  const r = await fetch(`https://api.linkedin.com${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "LinkedIn-Version": LI_VERSION,
+      "X-Restli-Protocol-Version": "2.0.0",
+      "Content-Type": "application/json",
+      ...(init.headers || {}),
+    },
+  });
+  return r;
+}
+
+async function uploadImage(token: string, author: string, imageUrl: string): Promise<string> {
+  // 1. Initialize upload
+  const initRes = await liFetch(`/rest/images?action=initializeUpload`, token, {
+    method: "POST",
+    body: JSON.stringify({ initializeUploadRequest: { owner: author } }),
+  });
+  if (!initRes.ok) throw new Error(`initializeUpload (image) failed: ${initRes.status} ${await initRes.text()}`);
+  const init = await initRes.json();
+  const uploadUrl: string = init.value.uploadUrl;
+  const imageUrn: string = init.value.image;
+
+  // 2. Download source image
+  const src = await fetch(imageUrl);
+  if (!src.ok) throw new Error(`Source image fetch failed: ${src.status}`);
+  const bytes = new Uint8Array(await src.arrayBuffer());
+
+  // 3. PUT binary
+  const up = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: { Authorization: `Bearer ${token}` },
+    body: bytes,
+  });
+  if (!up.ok) throw new Error(`Image upload failed: ${up.status} ${await up.text()}`);
+
+  return imageUrn;
+}
+
+async function uploadVideo(token: string, author: string, videoUrl: string): Promise<string> {
+  // Download first to know size
+  const src = await fetch(videoUrl);
+  if (!src.ok) throw new Error(`Source video fetch failed: ${src.status}`);
+  const bytes = new Uint8Array(await src.arrayBuffer());
+  const fileSize = bytes.byteLength;
+
+  const initRes = await liFetch(`/rest/videos?action=initializeUpload`, token, {
+    method: "POST",
+    body: JSON.stringify({
+      initializeUploadRequest: { owner: author, fileSizeBytes: fileSize, uploadCaptions: false, uploadThumbnail: false },
+    }),
+  });
+  if (!initRes.ok) throw new Error(`initializeUpload (video) failed: ${initRes.status} ${await initRes.text()}`);
+  const init = await initRes.json();
+  const videoUrn: string = init.value.video;
+  const instructions: { uploadUrl: string; firstByte: number; lastByte: number }[] = init.value.uploadInstructions || [];
+  const uploadToken: string = init.value.uploadToken || "";
+
+  const etags: string[] = [];
+  for (const ins of instructions) {
+    const chunk = bytes.slice(ins.firstByte, ins.lastByte + 1);
+    const up = await fetch(ins.uploadUrl, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: chunk,
+    });
+    if (!up.ok) throw new Error(`Video chunk upload failed: ${up.status} ${await up.text()}`);
+    const etag = up.headers.get("etag") || up.headers.get("ETag") || "";
+    etags.push(etag);
   }
-  return { ok: false, status: lastStatus, body: lastBody, error: lastErr };
+
+  // Finalize
+  const fin = await liFetch(`/rest/videos?action=finalizeUpload`, token, {
+    method: "POST",
+    body: JSON.stringify({
+      finalizeUploadRequest: { video: videoUrn, uploadToken, uploadedPartIds: etags },
+    }),
+  });
+  if (!fin.ok) throw new Error(`finalizeUpload (video) failed: ${fin.status} ${await fin.text()}`);
+
+  return videoUrn;
+}
+
+async function createPost(token: string, author: string, commentary: string, content: any | null) {
+  const body: any = {
+    author,
+    commentary,
+    visibility: "PUBLIC",
+    distribution: {
+      feedDistribution: "MAIN_FEED",
+      targetEntities: [],
+      thirdPartyDistributionChannels: [],
+    },
+    lifecycleState: "PUBLISHED",
+    isReshareDisabledByAuthor: false,
+  };
+  if (content) body.content = content;
+
+  const r = await liFetch(`/rest/posts`, token, { method: "POST", body: JSON.stringify(body) });
+  const text = await r.text();
+  if (!r.ok) throw new Error(`createPost failed: ${r.status} ${text}`);
+  const postUrn = r.headers.get("x-restli-id") || r.headers.get("X-RestLi-Id") || "";
+  return { postUrn, status: r.status };
+}
+
+// LinkedIn requires escaping certain chars in commentary
+function escapeCommentary(s: string): string {
+  return s.replace(/[\\(){}\[\]<>@|~_*#`]/g, (m) => `\\${m}`);
 }
 
 Deno.serve(async (req) => {
@@ -58,99 +140,74 @@ Deno.serve(async (req) => {
       : await q.lte("publish_at", new Date().toISOString());
     if (error) throw error;
 
-    const { data: settings } = await supabase.from("app_settings").select("webhook_url, caption_language").eq("id", 1).single();
-    const webhook = settings?.webhook_url;
-    const lang = (settings?.caption_language || "de") as "de" | "en" | "both";
+    const { data: settings } = await supabase
+      .from("app_settings")
+      .select("caption_language, linkedin_access_token, linkedin_author_urn")
+      .eq("id", 1)
+      .single();
+
+    const lang = (settings?.caption_language || "de") as Lang;
+    const token = settings?.linkedin_access_token;
+    const author = settings?.linkedin_author_urn;
+
+    if (!token || !author) {
+      return new Response(
+        JSON.stringify({ error: "LinkedIn nicht konfiguriert: Access Token und Author URN in Einstellungen hinterlegen." }),
+        { status: 400, headers: { ...cors, "Content-Type": "application/json" } },
+      );
+    }
 
     const results: any[] = [];
     for (const post of posts || []) {
-      if (!webhook) {
-        results.push({ id: post.id, skipped: "no webhook configured" });
-        continue;
-      }
-      const images: string[] = (post.post_images || [])
-        .sort((a: any, b: any) => a.sort_order - b.sort_order)
-        .map((i: any) => i.public_url)
-        .filter(Boolean);
+      try {
+        const images: string[] = (post.post_images || [])
+          .sort((a: any, b: any) => a.sort_order - b.sort_order)
+          .map((i: any) => i.public_url)
+          .filter(Boolean);
 
-      const tagLine = (post.hashtags || []).map((h: string) => "#" + h.replace(/^#/, "")).join(" ");
-      const de = `${post.translated_caption || ""}\n\n${post.translated_cta || ""}`.trim();
-      const en = `${post.original_caption || ""}\n\n${post.original_cta || ""}`.trim();
-      const body = lang === "en" ? en : lang === "both" ? `${de}\n\n— — —\n\n${en}` : de;
-      const caption = `${body}\n\n${tagLine}\n\n${post.link_url || ""}`.trim();
+        const tagLine = (post.hashtags || []).map((h: string) => "#" + h.replace(/^#/, "")).join(" ");
+        const de = `${post.translated_caption || ""}\n\n${post.translated_cta || ""}`.trim();
+        const en = `${post.original_caption || ""}\n\n${post.original_cta || ""}`.trim();
+        const body = lang === "en" ? en : lang === "both" ? `${de}\n\n— — —\n\n${en}` : de;
+        const commentary = escapeCommentary(`${body}\n\n${tagLine}\n\n${post.link_url || ""}`.trim());
 
-      // Helpers to derive file_name + mime_type from URL
-      const getFileName = (url: string) => {
-        try {
-          const u = new URL(url);
-          const last = u.pathname.split("/").pop() || "file";
-          return decodeURIComponent(last);
-        } catch {
-          return "file";
+        // Detect video by extension
+        const isVideo = (url: string) => /\.(mp4|mov|webm|m4v)(\?|$)/i.test(url);
+        const hasVideo = images.some(isVideo);
+
+        let content: any = null;
+        if (hasVideo) {
+          const videoUrl = images.find(isVideo)!;
+          const videoUrn = await uploadVideo(token, author, videoUrl);
+          content = { media: { id: videoUrn } };
+        } else if (images.length === 1) {
+          const imageUrn = await uploadImage(token, author, images[0]);
+          content = { media: { id: imageUrn } };
+        } else if (images.length > 1) {
+          const urns: string[] = [];
+          for (const url of images) {
+            urns.push(await uploadImage(token, author, url));
+          }
+          content = { multiImage: { images: urns.map((id) => ({ id })) } };
         }
-      };
-      const getMimeType = (fileName: string) => {
-        const ext = fileName.split(".").pop()?.toLowerCase() || "";
-        const map: Record<string, string> = {
-          jpg: "image/jpeg",
-          jpeg: "image/jpeg",
-          png: "image/png",
-          gif: "image/gif",
-          webp: "image/webp",
-          mp4: "video/mp4",
-          mov: "video/quicktime",
-          webm: "video/webm",
-        };
-        return map[ext] || "application/octet-stream";
-      };
 
-      // Determine post_type
-      let post_type: "TEXT" | "SINGLE IMAGE" | "VIDEO" | "CAROUSEL" = "TEXT";
-      const media = images.map((url) => {
-        const file_name = getFileName(url);
-        const mime_type = getMimeType(file_name);
-        const type = mime_type.startsWith("video/") ? "video" : "image";
-        return { type, url, file_name, mime_type };
-      });
-      const hasVideo = media.some((m) => m.type === "video");
-      if (hasVideo) post_type = "VIDEO";
-      else if (images.length > 1) post_type = "CAROUSEL";
-      else if (images.length === 1) post_type = "SINGLE IMAGE";
+        const { postUrn, status } = await createPost(token, author, commentary, content);
 
-      const payload = {
-        post_type,
-        caption,
-        media,
-        author: {
-          name: "",
-          email: "",
-        },
-        meta: {
-          created_at: new Date().toISOString(),
-          source: "lovable-app",
-          post_id: post.id,
-          focus: post.focus,
-          format: post.format,
-          language: lang,
-          caption_de: post.translated_caption,
-          caption_en: post.original_caption,
-          cta_de: post.translated_cta,
-          cta_en: post.original_cta,
-          hashtags: post.hashtags,
-          link: post.link_url || "",
-          publish_at: post.publish_at,
-        },
-      };
+        await supabase.from("posts").update({
+          status: "published",
+          published_at: new Date().toISOString(),
+          webhook_response: `LinkedIn ${status}: ${postUrn}`,
+        }).eq("id", post.id);
 
-      const result = await postWithRetry(webhook, payload);
-      await supabase.from("posts").update({
-        status: result.ok ? "published" : "failed",
-        published_at: result.ok ? new Date().toISOString() : null,
-        webhook_response: result.ok
-          ? `${result.status}: ${(result.body || "").slice(0, 500)}`
-          : `${result.error || "failed"}`,
-      }).eq("id", post.id);
-      results.push({ id: post.id, ok: result.ok, status: result.status });
+        results.push({ id: post.id, ok: true, postUrn });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        await supabase.from("posts").update({
+          status: "failed",
+          webhook_response: msg.slice(0, 1000),
+        }).eq("id", post.id);
+        results.push({ id: post.id, ok: false, error: msg });
+      }
     }
 
     return new Response(JSON.stringify({ processed: results.length, results }), {
