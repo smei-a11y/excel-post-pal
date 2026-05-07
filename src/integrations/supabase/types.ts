@@ -17,26 +17,26 @@ export type Database = {
       app_settings: {
         Row: {
           caption_language: string
-          id: number
           linkedin_access_token: string | null
           linkedin_author_urn: string | null
           updated_at: string
+          user_id: string
           webhook_url: string | null
         }
         Insert: {
           caption_language?: string
-          id?: number
           linkedin_access_token?: string | null
           linkedin_author_urn?: string | null
           updated_at?: string
+          user_id: string
           webhook_url?: string | null
         }
         Update: {
           caption_language?: string
-          id?: number
           linkedin_access_token?: string | null
           linkedin_author_urn?: string | null
           updated_at?: string
+          user_id?: string
           webhook_url?: string | null
         }
         Relationships: []
@@ -50,6 +50,7 @@ export type Database = {
           pdf_path: string | null
           source_filename: string | null
           status: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -59,6 +60,7 @@ export type Database = {
           pdf_path?: string | null
           source_filename?: string | null
           status?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -68,6 +70,7 @@ export type Database = {
           pdf_path?: string | null
           source_filename?: string | null
           status?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -79,6 +82,7 @@ export type Database = {
           public_url: string | null
           sort_order: number
           storage_path: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -87,6 +91,7 @@ export type Database = {
           public_url?: string | null
           sort_order?: number
           storage_path: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -95,6 +100,7 @@ export type Database = {
           public_url?: string | null
           sort_order?: number
           storage_path?: string
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -123,6 +129,7 @@ export type Database = {
           status: string
           translated_caption: string | null
           translated_cta: string | null
+          user_id: string | null
           webhook_response: string | null
         }
         Insert: {
@@ -141,6 +148,7 @@ export type Database = {
           status?: string
           translated_caption?: string | null
           translated_cta?: string | null
+          user_id?: string | null
           webhook_response?: string | null
         }
         Update: {
@@ -159,6 +167,7 @@ export type Database = {
           status?: string
           translated_caption?: string | null
           translated_cta?: string | null
+          user_id?: string | null
           webhook_response?: string | null
         }
         Relationships: [
