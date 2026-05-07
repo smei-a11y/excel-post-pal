@@ -14,6 +14,80 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 
 export const Route = createFileRoute("/")({ component: App });
 
+function LinkedInGuideDialog() {
+  const [origin, setOrigin] = useState("");
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+  const redirectUri = origin ? `${origin}/linkedin-callback` : "";
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => toast.success("Kopiert"));
+  };
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <button type="button" className="underline underline-offset-2 hover:text-primary text-left">
+          LinkedIn verbinden
+        </button>
+      </DialogTrigger>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>LinkedIn per OAuth verbinden</DialogTitle>
+          <DialogDescription>
+            Schritt-für-Schritt-Anleitung — einmalig pro LinkedIn-Konto einzurichten.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5 text-sm">
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">1. LinkedIn Developer App anlegen</h3>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+              <li>Öffne das <a className="underline" href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer">LinkedIn Developer Portal</a> und klicke auf <em>Create app</em>.</li>
+              <li>Fülle App-Name, LinkedIn-Page (deine Unternehmensseite) und Logo aus und akzeptiere die Bedingungen.</li>
+              <li>Im Tab <em>Products</em> die Produkte <strong>Sign In with LinkedIn using OpenID Connect</strong> und <strong>Share on LinkedIn</strong> anfordern (sind sofort freigeschaltet).</li>
+            </ol>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">2. Redirect-URLs hinterlegen</h3>
+            <p className="text-muted-foreground">Im Tab <em>Auth</em> unter <em>Authorized redirect URLs for your app</em> folgende URL eintragen (für jede Umgebung — Preview und Live-Domain — separat hinzufügen):</p>
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs break-all">
+              <span className="flex-1">{redirectUri || ".../linkedin-callback"}</span>
+              <Button size="icon" variant="ghost" onClick={() => copy(redirectUri)} disabled={!redirectUri}><Copy /></Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Mehrere URLs sind erlaubt. Nach dem Veröffentlichen die Live-Domain (z.B. <code>https://deine-domain.com/linkedin-callback</code>) ebenfalls eintragen.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">3. OAuth-Scopes</h3>
+            <p className="text-muted-foreground">Folgende Scopes müssen freigeschaltet sein (werden über die Produkte aus Schritt 1 automatisch aktiviert):</p>
+            <ul className="list-disc list-inside text-muted-foreground font-mono text-xs">
+              <li>openid</li>
+              <li>profile</li>
+              <li>email</li>
+              <li>w_member_social</li>
+            </ul>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">4. Client ID &amp; Client Secret</h3>
+            <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
+              <li>Im Tab <em>Auth</em> findest du <strong>Client ID</strong> und <strong>Primary Client Secret</strong>.</li>
+              <li>Beide sind in dieser App als <code>LINKEDIN_CLIENT_ID</code> und <code>LINKEDIN_CLIENT_SECRET</code> hinterlegt. Bei Änderungen in den Backend-Einstellungen aktualisieren.</li>
+            </ol>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">5. Verbinden</h3>
+            <p className="text-muted-foreground">
+              Oben rechts <em>Einstellungen</em> öffnen und <em>Mit LinkedIn verbinden</em> klicken. Im neuen Tab bei LinkedIn anmelden und Berechtigungen bestätigen — danach ist das Konto verknüpft.
+            </p>
+          </section>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 type PostImage = { id: string; public_url: string | null; sort_order: number };
 type Post = {
   id: string;
