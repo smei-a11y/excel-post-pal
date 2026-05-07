@@ -217,8 +217,8 @@ function App() {
   const onUpload = async (file: File) => {
     if (!userId) return;
     const lower = file.name.toLowerCase();
-    if (!lower.endsWith(".pdf") && !lower.endsWith(".pptx")) {
-      toast.error("Please upload a PDF or PPTX file");
+    if (!lower.endsWith(".pptx")) {
+      toast.error("Please upload a PPTX file");
       return;
     }
     setUploading(true);
@@ -228,7 +228,7 @@ function App() {
       if (upErr) throw upErr;
       const { data: batch, error: bErr } = await supabase.from("batches").insert({
         user_id: userId,
-        name: file.name.replace(/\.pdf$/i, ""),
+        name: file.name.replace(/\.pptx$/i, ""),
         source_filename: file.name,
         pdf_path: path,
       }).select().single();
@@ -344,7 +344,7 @@ function App() {
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planner</h1>
-            <p className="text-sm text-muted-foreground">Upload PDF · Auto-translate · Schedule and publish</p>
+            <p className="text-sm text-muted-foreground">Upload PPTX · Auto-translate · Schedule and publish</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:inline">{userEmail}</span>
@@ -421,7 +421,7 @@ function App() {
               Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in in the new tab and grant the permissions.
             </li>
             <li><span className="text-foreground font-medium">Choose caption language:</span> In Settings, pick the target language for your published posts.</li>
-            <li><span className="text-foreground font-medium">Upload PDF or PPTX:</span> Drag &amp; drop or pick your content file below. The AI extracts captions, images, date, time and hashtags and translates automatically. Use PPTX if your plan contains videos.</li>
+            <li><span className="text-foreground font-medium">Upload PPTX:</span> Drag &amp; drop or pick your PPTX content file below. The AI extracts captions, images, videos, date, time and hashtags and translates automatically.</li>
             <li><span className="text-foreground font-medium">Review &amp; edit posts:</span> Check each post below and adjust text, CTA, hashtags or scheduled time if needed.</li>
             <li><span className="text-foreground font-medium">Publish:</span> Posts go live automatically at the scheduled time — or instantly with <em>Send now</em>.</li>
           </ol>
@@ -431,7 +431,7 @@ function App() {
 
         {batches.length > 0 && (
           <section>
-            <h2 className="font-semibold mb-3">PDF uploads</h2>
+            <h2 className="font-semibold mb-3">PPTX uploads</h2>
             <div className="grid gap-2">
               {batches.map((b) => (
                 <Card key={b.id} className="px-4 py-3 flex items-center justify-between">
@@ -458,7 +458,7 @@ function App() {
           </div>
           {posts.length === 0 ? (
             <Card className="p-12 text-center text-muted-foreground">
-              No posts yet. Upload a PDF to get started.
+              No posts yet. Upload a PPTX to get started.
             </Card>
           ) : (
             <div className="grid gap-4">
@@ -491,11 +491,11 @@ function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: Fil
           {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
         </div>
         <div>
-          <h3 className="font-medium">Upload a new content plan (PDF or PPTX)</h3>
-          <p className="text-sm text-muted-foreground">AI extracts captions, date, time and hashtags and translates automatically. PPTX preserves embedded videos.</p>
+          <h3 className="font-medium">Upload a new content plan (PPTX)</h3>
+          <p className="text-sm text-muted-foreground">AI extracts captions, images, videos, date, time and hashtags and translates automatically.</p>
         </div>
         <label>
-          <input type="file" accept="application/pdf,.pdf,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" disabled={uploading}
+          <input type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
           <Button asChild disabled={uploading}><span>{uploading ? "Processing..." : "Choose file"}</span></Button>
         </label>
