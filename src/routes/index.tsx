@@ -420,7 +420,7 @@ function App() {
               Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in in the new tab and grant the permissions.
             </li>
             <li><span className="text-foreground font-medium">Choose caption language:</span> In Settings, pick the target language for your published posts.</li>
-            <li><span className="text-foreground font-medium">Upload PPTX:</span> Drag &amp; drop or pick your content file (SharePoint → B2B Marketing Tools) below. The AI extracts captions, images, videos, date, time and hashtags and translates automatically. <span className="italic">Das kann je nach Größe der PPTX-Datei und der Umwandlung in fertige Posts einige Minuten dauern. Nur die Ruhe – es ist nichts weiter zu tun!</span></li>
+            <li><span className="text-foreground font-medium">Upload PPTX:</span> Drag &amp; drop or pick your content file (SharePoint → B2B Marketing Tools) below. The AI extracts captions, images, videos, date, time and hashtags and translates automatically. <span className="font-bold text-foreground">This can take a few minutes depending on the size of your PPTX file and the conversion into ready-to-publish posts. Sit back and relax — there's nothing else for you to do!</span></li>
             <li><span className="text-foreground font-medium">Review &amp; edit posts:</span> Check each post below and adjust text, CTA, hashtags or scheduled time if needed.</li>
             <li><span className="text-foreground font-medium">Publish:</span> Posts go live automatically at the scheduled time — or instantly with <em>Send now</em>.</li>
           </ol>
