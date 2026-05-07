@@ -18,18 +18,24 @@ export type Database = {
         Row: {
           caption_language: string
           id: number
+          linkedin_access_token: string | null
+          linkedin_author_urn: string | null
           updated_at: string
           webhook_url: string | null
         }
         Insert: {
           caption_language?: string
           id?: number
+          linkedin_access_token?: string | null
+          linkedin_author_urn?: string | null
           updated_at?: string
           webhook_url?: string | null
         }
         Update: {
           caption_language?: string
           id?: number
+          linkedin_access_token?: string | null
+          linkedin_author_urn?: string | null
           updated_at?: string
           webhook_url?: string | null
         }
