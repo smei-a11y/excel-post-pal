@@ -88,6 +88,12 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --role="roles/storage.objectViewer" \
   --quiet >/dev/null
 
+info "Setze Artifact-Registry-Schreibzugriff für Build-Servicekonto: ${BUILD_SERVICE_ACCOUNT}"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${BUILD_SERVICE_ACCOUNT}" \
+  --role="roles/artifactregistry.writer" \
+  --quiet >/dev/null
+
 # ---- 6. Deploy -----------------------------------------------------------
 info "Deploye '$SERVICE' nach $REGION (das dauert 3–5 Min)…"
 gcloud run deploy "$SERVICE" \
