@@ -329,6 +329,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_next_batch: {
+        Args: never
+        Returns: {
+          created_at: string
+          error: string | null
+          id: string
+          name: string
+          pdf_path: string | null
+          source_filename: string | null
+          status: string
+          user_id: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "batches"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       delete_email: {
         Args: { message_id: number; queue_name: string }
         Returns: boolean
