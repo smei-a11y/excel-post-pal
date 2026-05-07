@@ -474,7 +474,6 @@ function App() {
 }
 
 function FeedbackFooter() {
-  const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
 
@@ -501,7 +500,7 @@ function FeedbackFooter() {
           templateName: "feedback",
           recipientEmail: "smei@boconcept.de",
           templateData: {
-            fromEmail: email.trim() || session.user.email || "anonymous",
+            fromEmail: session.user.email || "anonymous",
             message: message.trim(),
             source: window.location.hostname,
           },
@@ -512,7 +511,7 @@ function FeedbackFooter() {
         throw new Error(err.error || `Request failed (${res.status})`);
       }
       toast.success("Thanks! Your feedback was sent.");
-      setEmail(""); setMessage("");
+      setMessage("");
     } catch (e: any) {
       toast.error(e?.message || "Failed to send feedback");
     } finally {
@@ -522,26 +521,9 @@ function FeedbackFooter() {
 
   return (
     <footer className="border-t bg-card/40 mt-12">
-      <div className="max-w-6xl mx-auto px-6 py-10 grid gap-8 md:grid-cols-2">
-        <div className="space-y-2">
-          <h3 className="font-semibold">Contact</h3>
-          <p className="text-sm text-muted-foreground">
-            For direct inquiries, email us at{" "}
-            <a href="mailto:contact@linkedincontentgenerator.com" className="underline hover:text-primary">
-              contact@linkedincontentgenerator.com
-            </a>
-            .
-          </p>
-        </div>
+      <div className="max-w-2xl mx-auto px-6 py-10">
         <div className="space-y-3">
           <h3 className="font-semibold">Send feedback or suggestions</h3>
-          <Input
-            type="email"
-            placeholder="Your email (optional)"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            maxLength={255}
-          />
           <Textarea
             placeholder="Your suggestion or comment..."
             value={message}
