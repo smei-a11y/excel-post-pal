@@ -135,6 +135,7 @@ Gib für jeden Post zurück:
 
     for (const p of args.posts) {
       const { data: row, error } = await supabase.from("posts").insert({
+        user_id: userId,
         batch_id: batchId,
         position: p.position,
         focus: p.focus,
@@ -153,7 +154,7 @@ Gib für jeden Post zurück:
       try {
         const images = await extractPageImages(doc, pageIdx);
         for (let i = 0; i < images.length; i++) {
-          const path = `${batchId}/${row.id}/${i}.png`;
+          const path = `${userId}/${batchId}/${row.id}/${i}.png`;
           const { error: upErr } = await supabase.storage.from("post-images").upload(path, images[i], {
             contentType: "image/png",
             upsert: true,
@@ -161,6 +162,7 @@ Gib für jeden Post zurück:
           if (upErr) { console.error("upload err", upErr); continue; }
           const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
           await supabase.from("post_images").insert({
+            user_id: userId,
             post_id: row.id,
             storage_path: path,
             public_url: pub.publicUrl,
