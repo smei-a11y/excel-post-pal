@@ -46,24 +46,40 @@ Deno.serve(async (req) => {
     const { data: batch, error: bErr } = await supabase.from("batches").select("*").eq("id", batchId).eq("user_id", userId).single();
     if (bErr || !batch) throw new Error("batch not found");
 
+    const { data: settings } = await supabase
+      .from("app_settings")
+      .select("caption_language")
+      .eq("user_id", userId)
+      .maybeSingle();
+    const LANG_NAMES: Record<string, string> = {
+      de: "Deutsch", en: "Englisch", fr: "Französisch", es: "Spanisch", it: "Italienisch",
+      pt: "Portugiesisch", nl: "Niederländisch", pl: "Polnisch", sv: "Schwedisch", no: "Norwegisch",
+      da: "Dänisch", fi: "Finnisch", cs: "Tschechisch", sk: "Slowakisch", hu: "Ungarisch",
+      ro: "Rumänisch", bg: "Bulgarisch", el: "Griechisch", hr: "Kroatisch", sl: "Slowenisch",
+      et: "Estnisch", lv: "Lettisch", lt: "Litauisch", ga: "Irisch", mt: "Maltesisch",
+    };
+    const rawLang = (settings?.caption_language || "de") as string;
+    const targetCode = rawLang === "both" ? "de" : (rawLang === "en" ? "en" : rawLang);
+    const targetLangName = LANG_NAMES[targetCode] || "Deutsch";
+
     const { data: pdfBlob, error: dlErr } = await supabase.storage.from("post-pdfs").download(batch.pdf_path);
     if (dlErr || !pdfBlob) throw new Error("pdf download failed: " + dlErr?.message);
     const pdfBuf = new Uint8Array(await pdfBlob.arrayBuffer());
     const pdfBase64 = base64Encode(pdfBuf);
 
-    const systemPrompt = `Du extrahierst LinkedIn-Posts aus einem PDF Content-Plan und übersetzt sie ins Deutsche.
+    const systemPrompt = `Du extrahierst LinkedIn-Posts aus einem PDF Content-Plan und übersetzt sie ins ${targetLangName}.
 Gib für jeden Post zurück:
 - position (P1=1, P2=2, ...)
 - pdf_page (1-basierte Seitennummer im PDF wo dieser Post beschrieben ist; meist Übersichtsseite=1, P1 auf Seite 2, P2 auf Seite 3, etc.)
 - focus (Thema)
 - format (CAROUSEL/SINGLE IMAGE/VIDEO)
-- caption (Original Englisch, vollständig)
-- cta (Call to Action Original)
+- caption (Original, vollständig, unverändert)
+- cta (Call to Action Original, unverändert)
 - hashtags (Array, ohne #)
 - link_url
 - publish_at (ISO 8601 UTC, kombiniere DATE + TIME. DD.MM.YYYY. Bei Zeitspanne nimm Anfang.)
-- translated_caption (professionelle deutsche Übersetzung der caption)
-- translated_cta (deutsche Übersetzung des CTA)`;
+- translated_caption (professionelle Übersetzung der caption ins ${targetLangName}${targetCode === "en" ? " — falls Original bereits Englisch ist, übernehme es 1:1" : ""})
+- translated_cta (Übersetzung des CTA ins ${targetLangName})`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -75,7 +91,7 @@ Gib für jeden Post zurück:
           {
             role: "user",
             content: [
-              { type: "text", text: "Extrahiere alle Posts aus diesem PDF und übersetze ins Deutsche." },
+              { type: "text", text: `Extrahiere alle Posts aus diesem PDF und übersetze ins ${targetLangName}.` },
               { type: "file", file: { filename: batch.source_filename || "content.pdf", file_data: `data:application/pdf;base64,${pdfBase64}` } },
             ],
           },
