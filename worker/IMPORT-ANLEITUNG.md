@@ -26,8 +26,16 @@ Im Cloud Shell folgende Befehle ausführen (Code aus diesem Repo holen + Image b
 # (Im Cloud Shell oben rechts: ⋮ → Datei hochladen → worker.zip)
 unzip worker.zip && cd worker
 
+# Einmalig: Build-Servicekonto korrekt berechtigen
+PROJECT_ID=$(gcloud config get-value project)
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/storage.objectViewer" \
+  --quiet
+
 # Image bauen (dauert 3-5 Min beim ersten Mal)
-gcloud builds submit --tag gcr.io/$(gcloud config get-value project)/pptx-worker
+gcloud builds submit --tag gcr.io/${PROJECT_ID}/pptx-worker
 
 # Image-URL merken — sie sieht so aus:
 # gcr.io/dein-projekt-id/pptx-worker
@@ -92,8 +100,9 @@ Sag mir die beiden Werte, dann lege ich die Secrets in Lovable an:
 Wenn ich am Worker-Code etwas ändere:
 ```bash
 cd worker
-gcloud builds submit --tag gcr.io/$(gcloud config get-value project)/pptx-worker
-gcloud run deploy pptx-worker --image gcr.io/$(gcloud config get-value project)/pptx-worker --region europe-west1
+PROJECT_ID=$(gcloud config get-value project)
+gcloud builds submit --tag gcr.io/${PROJECT_ID}/pptx-worker
+gcloud run deploy pptx-worker --image gcr.io/${PROJECT_ID}/pptx-worker --region europe-west1
 ```
 
 ---
