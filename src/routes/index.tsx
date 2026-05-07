@@ -299,8 +299,13 @@ function App() {
             So funktioniert's
           </h2>
           <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-            <li><span className="text-foreground font-medium">LinkedIn verbinden:</span> Öffne <em>Einstellungen</em> oben rechts und klicke auf <em>Mit LinkedIn verbinden</em>. Im neuen Tab anmelden und Berechtigungen erteilen.</li>
-            <li><span className="text-foreground font-medium">Caption-Sprache wählen:</span> In den Einstellungen festlegen, ob Posts auf Deutsch, Englisch oder zweisprachig veröffentlicht werden.</li>
+            <li>
+              <span className="text-foreground font-medium">
+                <LinkedInGuideDialog />:
+              </span>{" "}
+              Öffne <em>Einstellungen</em> oben rechts und klicke auf <em>Mit LinkedIn verbinden</em>. Im neuen Tab anmelden und Berechtigungen erteilen.
+            </li>
+            <li><span className="text-foreground font-medium">Caption-Sprache wählen:</span> In den Einstellungen festlegen, ob Posts auf Deutsch oder Englisch veröffentlicht werden.</li>
             <li><span className="text-foreground font-medium">PDF hochladen:</span> Content-PDF unten per Drag &amp; Drop oder Auswahl hochladen. Die KI extrahiert Captions, Bilder, Datum, Uhrzeit und Hashtags und übersetzt automatisch.</li>
             <li><span className="text-foreground font-medium">Posts prüfen &amp; bearbeiten:</span> Jeden Post unten kontrollieren, Text/CTA/Hashtags und Veröffentlichungszeitpunkt bei Bedarf anpassen.</li>
             <li><span className="text-foreground font-medium">Veröffentlichen:</span> Posts werden zum geplanten Zeitpunkt automatisch publiziert — oder per <em>Jetzt senden</em> sofort.</li>
