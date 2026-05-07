@@ -217,7 +217,7 @@ function App() {
   const onUpload = async (file: File) => {
     if (!userId) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) {
-      toast.error("Bitte eine PDF-Datei hochladen");
+      toast.error("Please upload a PDF file");
       return;
     }
     setUploading(true);
@@ -232,13 +232,13 @@ function App() {
         pdf_path: path,
       }).select().single();
       if (bErr) throw bErr;
-      toast.success("PDF hochgeladen — KI extrahiert jetzt die Posts...");
+      toast.success("PDF uploaded — AI is now extracting the posts...");
       const { error: fnErr } = await supabase.functions.invoke("extract-pdf", { body: { batchId: batch.id } });
       if (fnErr) throw fnErr;
-      toast.success("Posts extrahiert und übersetzt!");
+      toast.success("Posts extracted and translated!");
       load();
     } catch (e: any) {
-      toast.error("Fehler: " + (e?.message || e));
+      toast.error("Error: " + (e?.message || e));
     } finally {
       setUploading(false);
     }
