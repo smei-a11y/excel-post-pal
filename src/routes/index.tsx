@@ -491,11 +491,11 @@ function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: Fil
           {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
         </div>
         <div>
-          <h3 className="font-medium">Upload a new content plan (PDF or PPTX)</h3>
-          <p className="text-sm text-muted-foreground">AI extracts captions, date, time and hashtags and translates automatically. PPTX preserves embedded videos.</p>
+          <h3 className="font-medium">Upload a new content plan (PPTX)</h3>
+          <p className="text-sm text-muted-foreground">AI extracts captions, images, videos, date, time and hashtags and translates automatically.</p>
         </div>
         <label>
-          <input type="file" accept="application/pdf,.pdf,.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" disabled={uploading}
+          <input type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
           <Button asChild disabled={uploading}><span>{uploading ? "Processing..." : "Choose file"}</span></Button>
         </label>
