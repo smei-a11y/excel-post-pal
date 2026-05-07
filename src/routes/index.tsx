@@ -50,17 +50,16 @@ function LinkedInGuideDialog() {
             <h3 className="font-semibold text-foreground">2. Add redirect URLs</h3>
             <p className="text-muted-foreground">In the <em>Auth</em> tab, under <em>Authorized redirect URLs for your app</em>, add the following URLs (each as a separate entry):</p>
             {[
-              redirectUri,
               "https://www.linkedincontentgenerator.com/linkedin-callback",
               "https://linkedincontentgenerator.com/linkedin-callback",
-            ].filter(Boolean).map((url) => (
+            ].map((url) => (
               <div key={url} className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs break-all">
                 <span className="flex-1">{url}</span>
                 <Button size="icon" variant="ghost" onClick={() => copy(url)}><Copy /></Button>
               </div>
             ))}
             <p className="text-xs text-muted-foreground">
-              The first URL is the current preview environment, the other two are the live domain (with and without <code>www</code>).
+              Add both entries — the live domain with and without <code>www</code>.
             </p>
           </section>
 
