@@ -116,7 +116,36 @@ type Post = {
 };
 
 type Batch = { id: string; name: string; status: string; error: string | null; created_at: string };
-type Lang = "de" | "en" | "both";
+type Lang = string; // ISO-Code der Zielsprache, "en" = Original (keine Übersetzung), "both" = DE + EN
+
+const LANGUAGES: { code: string; label: string }[] = [
+  { code: "de", label: "Deutsch" },
+  { code: "en", label: "Englisch (Original)" },
+  { code: "both", label: "Deutsch + Englisch" },
+  { code: "fr", label: "Französisch" },
+  { code: "es", label: "Spanisch" },
+  { code: "it", label: "Italienisch" },
+  { code: "pt", label: "Portugiesisch" },
+  { code: "nl", label: "Niederländisch" },
+  { code: "pl", label: "Polnisch" },
+  { code: "sv", label: "Schwedisch" },
+  { code: "no", label: "Norwegisch" },
+  { code: "da", label: "Dänisch" },
+  { code: "fi", label: "Finnisch" },
+  { code: "cs", label: "Tschechisch" },
+  { code: "sk", label: "Slowakisch" },
+  { code: "hu", label: "Ungarisch" },
+  { code: "ro", label: "Rumänisch" },
+  { code: "bg", label: "Bulgarisch" },
+  { code: "el", label: "Griechisch" },
+  { code: "hr", label: "Kroatisch" },
+  { code: "sl", label: "Slowenisch" },
+  { code: "et", label: "Estnisch" },
+  { code: "lv", label: "Lettisch" },
+  { code: "lt", label: "Litauisch" },
+  { code: "ga", label: "Irisch" },
+  { code: "mt", label: "Maltesisch" },
+];
 
 function App() {
   const navigate = useNavigate();
