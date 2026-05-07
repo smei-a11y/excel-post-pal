@@ -41,6 +41,8 @@ function App() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [webhook, setWebhook] = useState("");
   const [lang, setLang] = useState<Lang>("de");
+  const [liToken, setLiToken] = useState("");
+  const [liAuthor, setLiAuthor] = useState("");
   const [uploading, setUploading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
@@ -48,12 +50,14 @@ function App() {
     const [b, p, s] = await Promise.all([
       supabase.from("batches").select("*").order("created_at", { ascending: false }),
       supabase.from("posts").select("*, post_images(id, public_url, sort_order)").order("publish_at", { ascending: true }),
-      supabase.from("app_settings").select("webhook_url, caption_language").eq("id", 1).single(),
+      supabase.from("app_settings").select("webhook_url, caption_language, linkedin_access_token, linkedin_author_urn").eq("id", 1).single(),
     ]);
     if (b.data) setBatches(b.data as any);
     if (p.data) setPosts(p.data as any);
     if (s.data?.webhook_url) setWebhook(s.data.webhook_url);
     if ((s.data as any)?.caption_language) setLang((s.data as any).caption_language as Lang);
+    if ((s.data as any)?.linkedin_access_token) setLiToken((s.data as any).linkedin_access_token);
+    if ((s.data as any)?.linkedin_author_urn) setLiAuthor((s.data as any).linkedin_author_urn);
   }, []);
 
   useEffect(() => {
@@ -95,7 +99,13 @@ function App() {
   };
 
   const saveSettings = async () => {
-    const { error } = await supabase.from("app_settings").update({ webhook_url: webhook, caption_language: lang, updated_at: new Date().toISOString() }).eq("id", 1);
+    const { error } = await supabase.from("app_settings").update({
+      webhook_url: webhook,
+      caption_language: lang,
+      linkedin_access_token: liToken || null,
+      linkedin_author_urn: liAuthor || null,
+      updated_at: new Date().toISOString(),
+    }).eq("id", 1);
     if (error) toast.error(error.message);
     else toast.success("Einstellungen gespeichert");
   };
@@ -145,9 +155,26 @@ function App() {
         {showSettings && (
           <Card className="p-6 space-y-5">
             <div className="space-y-3">
-              <h2 className="font-semibold">Webhook-URL (Make / Zapier / n8n)</h2>
+              <h2 className="font-semibold">LinkedIn — Direktveröffentlichung</h2>
               <p className="text-sm text-muted-foreground">
-                Geplante Posts werden zur eingestellten Zeit per POST an diese URL gesendet (mit Text, Hashtags, Bildern, Link).
+                Posts werden direkt aus dieser App an LinkedIn gesendet (kein Make/Zapier nötig). Du brauchst einen Access Token mit Scope <code>w_member_social</code> (persönliches Profil) oder <code>w_organization_social</code> (Firmen-Seite) und den Author-URN.
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="li-token" className="text-xs">Access Token</Label>
+                <Input id="li-token" type="password" value={liToken} onChange={(e) => setLiToken(e.target.value)} placeholder="AQX..." />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="li-author" className="text-xs">Author URN</Label>
+                <Input id="li-author" value={liAuthor} onChange={(e) => setLiAuthor(e.target.value)} placeholder="urn:li:person:XXXX  oder  urn:li:organization:12345" />
+                <p className="text-xs text-muted-foreground">
+                  Persönliches Profil: <code>urn:li:person:&lt;Mitglieds-ID&gt;</code> · Firmen-Seite: <code>urn:li:organization:&lt;Firmen-ID&gt;</code>
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3 opacity-60">
+              <h2 className="font-semibold text-sm">Webhook-URL (optional / Legacy)</h2>
+              <p className="text-xs text-muted-foreground">
+                Wird nicht mehr verwendet. Veröffentlichung läuft jetzt direkt über LinkedIn.
               </p>
               <Input value={webhook} onChange={(e) => setWebhook(e.target.value)} placeholder="https://hooks.zapier.com/..." />
             </div>
