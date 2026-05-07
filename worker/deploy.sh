@@ -74,6 +74,20 @@ gcloud services enable \
   artifactregistry.googleapis.com \
   --project="$PROJECT_ID"
 
+# ---- 5b. Build-Servicekonto berechtigen ----------------------------------
+# Neue Google-Cloud-Projekte verwenden häufig das Compute-Default-Servicekonto
+# für Cloud Build. Ohne Storage-Lesezugriff kann `gcloud run deploy --source`
+# den hochgeladenen Quellcode-Tarball nicht lesen und bricht mit
+# `storage.objects.get` ab. Die Projektnummer wird live abgefragt, damit keine
+# Zahlendreher in kopierten Servicekonto-Adressen entstehen.
+PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')
+BUILD_SERVICE_ACCOUNT="${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+info "Setze Storage-Lesezugriff für Build-Servicekonto: ${BUILD_SERVICE_ACCOUNT}"
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${BUILD_SERVICE_ACCOUNT}" \
+  --role="roles/storage.objectViewer" \
+  --quiet >/dev/null
+
 # ---- 6. Deploy -----------------------------------------------------------
 info "Deploye '$SERVICE' nach $REGION (das dauert 3–5 Min)…"
 gcloud run deploy "$SERVICE" \
