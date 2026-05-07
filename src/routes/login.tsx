@@ -50,7 +50,7 @@ function LoginPage() {
       <Card className="w-full max-w-md p-8 space-y-6">
         <div className="space-y-1">
           <h1 className="text-2xl font-semibold tracking-tight">Anmelden</h1>
-          <p className="text-sm text-muted-foreground">LinkedIn Content Planer · Interner Zugang</p>
+          <p className="text-sm text-muted-foreground">LinkedIn Content Planer · BoConcept</p>
         </div>
 
         <form onSubmit={onLogin} className="space-y-4">
