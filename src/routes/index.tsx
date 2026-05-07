@@ -342,13 +342,13 @@ function App() {
       <header className="border-b bg-card/60 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planer</h1>
-            <p className="text-sm text-muted-foreground">PDF hochladen · Automatisch übersetzen · Geplant veröffentlichen</p>
+            <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planner</h1>
+            <p className="text-sm text-muted-foreground">Upload PDF · Auto-translate · Schedule and publish</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:inline">{userEmail}</span>
             <Button variant="outline" size="sm" onClick={() => setShowSettings((s) => !s)}>
-              <SettingsIcon /> Einstellungen
+              <SettingsIcon /> Settings
             </Button>
             <Button variant="ghost" size="sm" onClick={logout}>
               <LogOut />
