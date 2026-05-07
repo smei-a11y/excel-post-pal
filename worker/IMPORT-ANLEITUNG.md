@@ -33,12 +33,24 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
   --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
   --role="roles/storage.objectViewer" \
   --quiet
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member="serviceAccount:${PROJECT_NUMBER}-compute@developer.gserviceaccount.com" \
+  --role="roles/artifactregistry.writer" \
+  --quiet
+
+# Artifact Registry Repository anlegen, falls es noch nicht existiert
+gcloud services enable artifactregistry.googleapis.com cloudbuild.googleapis.com run.googleapis.com
+gcloud artifacts repositories describe pptx --location=europe-west1 >/dev/null 2>&1 || \
+  gcloud artifacts repositories create pptx \
+    --repository-format=docker \
+    --location=europe-west1 \
+    --description="PPTX worker images"
 
 # Image bauen (dauert 3-5 Min beim ersten Mal)
-gcloud builds submit --tag gcr.io/${PROJECT_ID}/pptx-worker
+gcloud builds submit --tag europe-west1-docker.pkg.dev/${PROJECT_ID}/pptx/pptx-worker
 
 # Image-URL merken — sie sieht so aus:
-# gcr.io/dein-projekt-id/pptx-worker
+# europe-west1-docker.pkg.dev/dein-projekt-id/pptx/pptx-worker
 ```
 
 ---
@@ -49,7 +61,7 @@ gcloud builds submit --tag gcr.io/${PROJECT_ID}/pptx-worker
 
 | Platzhalter | Was eintragen |
 |---|---|
-| `REPLACE_ME_IMAGE_URL` | Die Image-URL aus Schritt 2 (z.B. `gcr.io/pptx-worker-123/pptx-worker`) |
+| `REPLACE_ME_IMAGE_URL` | Die Image-URL aus Schritt 2 (z.B. `europe-west1-docker.pkg.dev/pptx-worker-123/pptx/pptx-worker`) |
 | `REPLACE_ME_SERVICE_ROLE_KEY` | Lovable → **Cloud → Secrets** → `SUPABASE_SERVICE_ROLE_KEY` |
 | `REPLACE_ME_LOVABLE_API_KEY` | Lovable → **Cloud → Secrets** → `LOVABLE_API_KEY` |
 | `REPLACE_ME_GENERATE_RANDOM_64_CHARS` | Im Cloud Shell: `openssl rand -hex 32` ausführen, Output kopieren |
@@ -101,8 +113,8 @@ Wenn ich am Worker-Code etwas ändere:
 ```bash
 cd worker
 PROJECT_ID=$(gcloud config get-value project)
-gcloud builds submit --tag gcr.io/${PROJECT_ID}/pptx-worker
-gcloud run deploy pptx-worker --image gcr.io/${PROJECT_ID}/pptx-worker --region europe-west1
+gcloud builds submit --tag europe-west1-docker.pkg.dev/${PROJECT_ID}/pptx/pptx-worker
+gcloud run deploy pptx-worker --image europe-west1-docker.pkg.dev/${PROJECT_ID}/pptx/pptx-worker --region europe-west1
 ```
 
 ---
