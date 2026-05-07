@@ -325,7 +325,7 @@ function App() {
       linkedin_connected_name: null,
     }).eq("user_id", userId);
     setLiToken(""); setLiAuthor(""); setLiConnectedName(""); setLiExpiresAt(null);
-    toast.success("LinkedIn getrennt");
+    toast.success("LinkedIn disconnected");
   };
 
   if (!authReady || !userId) {
