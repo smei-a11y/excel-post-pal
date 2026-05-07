@@ -546,17 +546,17 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
           ))}
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Keine Bilder</div>
+        <div className="text-xs text-muted-foreground flex items-center gap-1"><ImageIcon className="h-3 w-3" /> No images</div>
       )}
 
       {editing ? (
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Caption (DE)</label>
+            <label className="text-xs font-medium text-muted-foreground">Translated caption</label>
             <Textarea rows={6} value={caption} onChange={(e) => setCaption(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">CTA (DE)</label>
+            <label className="text-xs font-medium text-muted-foreground">Translated CTA</label>
             <Input value={cta} onChange={(e) => setCta(e.target.value)} />
           </div>
           <div>
@@ -564,26 +564,26 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="BoConcept InteriorDesign" />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Veröffentlichen am</label>
+            <label className="text-xs font-medium text-muted-foreground">Publish at</label>
             <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={save}>Speichern</Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Abbrechen</Button>
+            <Button size="sm" onClick={save}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
           </div>
         </div>
       ) : (
         <>
-          {showDe && (
+          {showTranslated && (
             <div className="space-y-1">
-              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Deutsch</div>}
+              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Translated</div>}
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{post.translated_caption}</p>
               {post.translated_cta && <p className="text-sm font-medium text-primary">{post.translated_cta}</p>}
             </div>
           )}
-          {showEn && (
+          {showOriginal && (
             <div className="space-y-1">
-              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">English</div>}
+              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Original (English)</div>}
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{post.original_caption}</p>
               {post.original_cta && <p className="text-sm font-medium text-primary">{post.original_cta}</p>}
             </div>
@@ -602,11 +602,11 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
       <div className="flex items-center justify-between pt-2 border-t">
         <div className="text-xs text-muted-foreground flex items-center gap-1">
           <Calendar className="h-3 w-3" />
-          {post.publish_at ? new Date(post.publish_at).toLocaleString("de-DE") : "Kein Datum"}
+          {post.publish_at ? new Date(post.publish_at).toLocaleString("en-US") : "No date"}
         </div>
         <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setEditing((e) => !e)}>Bearbeiten</Button>
-          <Button size="sm" variant="outline" onClick={onPublish}><Send /> Jetzt senden</Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing((e) => !e)}>Edit</Button>
+          <Button size="sm" variant="outline" onClick={onPublish}><Send /> Send now</Button>
           <Button size="sm" variant="ghost" onClick={onDelete}><Trash2 /></Button>
         </div>
       </div>
