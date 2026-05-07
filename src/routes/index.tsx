@@ -20,35 +20,35 @@ function LinkedInGuideDialog() {
   useEffect(() => { setOrigin(window.location.origin); }, []);
   const redirectUri = origin ? `${origin}/linkedin-callback` : "";
   const copy = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => toast.success("Kopiert"));
+    navigator.clipboard.writeText(text).then(() => toast.success("Copied"));
   };
   return (
     <Dialog>
       <DialogTrigger asChild>
         <button type="button" className="underline underline-offset-2 hover:text-primary text-left">
-          LinkedIn verbinden
+          Connect LinkedIn
         </button>
       </DialogTrigger>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>LinkedIn per OAuth verbinden</DialogTitle>
+          <DialogTitle>Connect LinkedIn via OAuth</DialogTitle>
           <DialogDescription>
-            Schritt-für-Schritt-Anleitung — einmalig pro LinkedIn-Konto einzurichten.
+            Step-by-step guide — only needs to be set up once per LinkedIn account.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-5 text-sm">
           <section className="space-y-2">
-            <h3 className="font-semibold text-foreground">1. LinkedIn Developer App anlegen</h3>
+            <h3 className="font-semibold text-foreground">1. Create a LinkedIn Developer App</h3>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Öffne das <a className="underline" href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer">LinkedIn Developer Portal</a> und klicke auf <em>Create app</em>.</li>
-              <li>Fülle App-Name, LinkedIn-Page (deine Unternehmensseite) und Logo aus und akzeptiere die Bedingungen.</li>
-              <li>Im Tab <em>Products</em> die Produkte <strong>Sign In with LinkedIn using OpenID Connect</strong> und <strong>Share on LinkedIn</strong> anfordern (sind sofort freigeschaltet).</li>
+              <li>Open the <a className="underline" href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer">LinkedIn Developer Portal</a> and click <em>Create app</em>.</li>
+              <li>Fill in the app name, LinkedIn Page (your company page) and logo, and accept the terms.</li>
+              <li>Under the <em>Products</em> tab, request <strong>Sign In with LinkedIn using OpenID Connect</strong> and <strong>Share on LinkedIn</strong> (both are granted instantly).</li>
             </ol>
           </section>
 
           <section className="space-y-2">
-            <h3 className="font-semibold text-foreground">2. Redirect-URLs hinterlegen</h3>
-            <p className="text-muted-foreground">Im Tab <em>Auth</em> unter <em>Authorized redirect URLs for your app</em> folgende URLs eintragen (jede URL als separaten Eintrag hinzufügen):</p>
+            <h3 className="font-semibold text-foreground">2. Add redirect URLs</h3>
+            <p className="text-muted-foreground">In the <em>Auth</em> tab, under <em>Authorized redirect URLs for your app</em>, add the following URLs (each as a separate entry):</p>
             {[
               redirectUri,
               "https://www.linkedincontentgenerator.com/linkedin-callback",
@@ -60,13 +60,13 @@ function LinkedInGuideDialog() {
               </div>
             ))}
             <p className="text-xs text-muted-foreground">
-              Die erste URL ist die aktuelle Preview-Umgebung, die anderen beiden sind die Live-Domain (mit und ohne <code>www</code>).
+              The first URL is the current preview environment, the other two are the live domain (with and without <code>www</code>).
             </p>
           </section>
 
           <section className="space-y-2">
-            <h3 className="font-semibold text-foreground">3. OAuth-Scopes</h3>
-            <p className="text-muted-foreground">Folgende Scopes müssen freigeschaltet sein (werden über die Produkte aus Schritt 1 automatisch aktiviert):</p>
+            <h3 className="font-semibold text-foreground">3. OAuth scopes</h3>
+            <p className="text-muted-foreground">The following scopes must be enabled (they are activated automatically through the products from step 1):</p>
             <ul className="list-disc list-inside text-muted-foreground font-mono text-xs">
               <li>openid</li>
               <li>profile</li>
@@ -78,15 +78,15 @@ function LinkedInGuideDialog() {
           <section className="space-y-2">
             <h3 className="font-semibold text-foreground">4. Client ID &amp; Client Secret</h3>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Im Tab <em>Auth</em> findest du <strong>Client ID</strong> und <strong>Primary Client Secret</strong>.</li>
-              <li>Beide sind in dieser App als <code>LINKEDIN_CLIENT_ID</code> und <code>LINKEDIN_CLIENT_SECRET</code> hinterlegt. Bei Änderungen in den Backend-Einstellungen aktualisieren.</li>
+              <li>You will find the <strong>Client ID</strong> and <strong>Primary Client Secret</strong> in the <em>Auth</em> tab.</li>
+              <li>Both are stored in this app as <code>LINKEDIN_CLIENT_ID</code> and <code>LINKEDIN_CLIENT_SECRET</code>. Update them in the backend settings if they change.</li>
             </ol>
           </section>
 
           <section className="space-y-2">
-            <h3 className="font-semibold text-foreground">5. Verbinden</h3>
+            <h3 className="font-semibold text-foreground">5. Connect</h3>
             <p className="text-muted-foreground">
-              Oben rechts <em>Einstellungen</em> öffnen und <em>Mit LinkedIn verbinden</em> klicken. Im neuen Tab bei LinkedIn anmelden und Berechtigungen bestätigen — danach ist das Konto verknüpft.
+              Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in to LinkedIn in the new tab and confirm the permissions — your account is then linked.
             </p>
           </section>
         </div>
@@ -116,35 +116,35 @@ type Post = {
 };
 
 type Batch = { id: string; name: string; status: string; error: string | null; created_at: string };
-type Lang = string; // ISO-Code der Zielsprache, "en" = Original (keine Übersetzung), "both" = DE + EN
+type Lang = string; // ISO code of target language; "en" = original (no translation), "both" = EN + DE
 
 const LANGUAGES: { code: string; label: string }[] = [
-  { code: "de", label: "Deutsch" },
-  { code: "en", label: "Englisch (Original)" },
-  { code: "both", label: "Deutsch + Englisch" },
-  { code: "fr", label: "Französisch" },
-  { code: "es", label: "Spanisch" },
-  { code: "it", label: "Italienisch" },
-  { code: "pt", label: "Portugiesisch" },
-  { code: "nl", label: "Niederländisch" },
-  { code: "pl", label: "Polnisch" },
-  { code: "sv", label: "Schwedisch" },
-  { code: "no", label: "Norwegisch" },
-  { code: "da", label: "Dänisch" },
-  { code: "fi", label: "Finnisch" },
-  { code: "cs", label: "Tschechisch" },
-  { code: "sk", label: "Slowakisch" },
-  { code: "hu", label: "Ungarisch" },
-  { code: "ro", label: "Rumänisch" },
-  { code: "bg", label: "Bulgarisch" },
-  { code: "el", label: "Griechisch" },
-  { code: "hr", label: "Kroatisch" },
-  { code: "sl", label: "Slowenisch" },
-  { code: "et", label: "Estnisch" },
-  { code: "lv", label: "Lettisch" },
-  { code: "lt", label: "Litauisch" },
-  { code: "ga", label: "Irisch" },
-  { code: "mt", label: "Maltesisch" },
+  { code: "en", label: "English (original)" },
+  { code: "de", label: "German" },
+  { code: "both", label: "English + German" },
+  { code: "fr", label: "French" },
+  { code: "es", label: "Spanish" },
+  { code: "it", label: "Italian" },
+  { code: "pt", label: "Portuguese" },
+  { code: "nl", label: "Dutch" },
+  { code: "pl", label: "Polish" },
+  { code: "sv", label: "Swedish" },
+  { code: "no", label: "Norwegian" },
+  { code: "da", label: "Danish" },
+  { code: "fi", label: "Finnish" },
+  { code: "cs", label: "Czech" },
+  { code: "sk", label: "Slovak" },
+  { code: "hu", label: "Hungarian" },
+  { code: "ro", label: "Romanian" },
+  { code: "bg", label: "Bulgarian" },
+  { code: "el", label: "Greek" },
+  { code: "hr", label: "Croatian" },
+  { code: "sl", label: "Slovenian" },
+  { code: "et", label: "Estonian" },
+  { code: "lv", label: "Latvian" },
+  { code: "lt", label: "Lithuanian" },
+  { code: "ga", label: "Irish" },
+  { code: "mt", label: "Maltese" },
 ];
 
 function App() {
@@ -155,7 +155,7 @@ function App() {
 
   const [batches, setBatches] = useState<Batch[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [lang, setLang] = useState<Lang>("de");
+  const [lang, setLang] = useState<Lang>("en");
   const [liToken, setLiToken] = useState("");
   const [liAuthor, setLiAuthor] = useState("");
   const [liConnectedName, setLiConnectedName] = useState<string>("");
@@ -217,7 +217,7 @@ function App() {
   const onUpload = async (file: File) => {
     if (!userId) return;
     if (!file.name.toLowerCase().endsWith(".pdf")) {
-      toast.error("Bitte eine PDF-Datei hochladen");
+      toast.error("Please upload a PDF file");
       return;
     }
     setUploading(true);
@@ -232,13 +232,13 @@ function App() {
         pdf_path: path,
       }).select().single();
       if (bErr) throw bErr;
-      toast.success("PDF hochgeladen — KI extrahiert jetzt die Posts...");
+      toast.success("PDF uploaded — AI is now extracting the posts...");
       const { error: fnErr } = await supabase.functions.invoke("extract-pdf", { body: { batchId: batch.id } });
       if (fnErr) throw fnErr;
-      toast.success("Posts extrahiert und übersetzt!");
+      toast.success("Posts extracted and translated!");
       load();
     } catch (e: any) {
-      toast.error("Fehler: " + (e?.message || e));
+      toast.error("Error: " + (e?.message || e));
     } finally {
       setUploading(false);
     }
@@ -254,15 +254,15 @@ function App() {
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
     if (error) toast.error(error.message);
-    else toast.success("Einstellungen gespeichert");
+    else toast.success("Settings saved");
   };
 
   const publishNow = async (postId: string) => {
-    const t = toast.loading("Wird veröffentlicht...");
+    const t = toast.loading("Publishing...");
     const { data, error } = await supabase.functions.invoke("publish-due-posts", { body: { postId } });
     toast.dismiss(t);
     if (error) toast.error(error.message);
-    else toast.success("Gesendet: " + JSON.stringify(data?.results?.[0] || {}));
+    else toast.success("Sent: " + JSON.stringify(data?.results?.[0] || {}));
     load();
   };
 
@@ -297,19 +297,19 @@ function App() {
       });
       if (error) throw error;
       if (data?.authUrl) {
-        // Wenn die App im iframe läuft (Lovable Preview), neuen Tab öffnen,
-        // sonst Top-Level navigieren. LinkedIn blockiert iframe-Einbettung.
+        // If the app runs inside an iframe (Lovable preview), open a new tab,
+        // otherwise navigate at top level. LinkedIn blocks iframe embedding.
         const inIframe = window.self !== window.top;
         if (inIframe) {
           window.open(data.authUrl, "_blank", "noopener,noreferrer");
-          toast.message("LinkedIn wurde in neuem Tab geöffnet. Nach dem Anmelden zurück hierher kommen.");
+          toast.message("LinkedIn opened in a new tab. Come back here after signing in.");
           setLiConnecting(false);
         } else {
           window.location.href = data.authUrl;
         }
       }
     } catch (e: any) {
-      toast.error("LinkedIn-Verbindung fehlgeschlagen: " + (e?.message || e));
+      toast.error("LinkedIn connection failed: " + (e?.message || e));
       setLiConnecting(false);
     }
   };
@@ -325,7 +325,7 @@ function App() {
       linkedin_connected_name: null,
     }).eq("user_id", userId);
     setLiToken(""); setLiAuthor(""); setLiConnectedName(""); setLiExpiresAt(null);
-    toast.success("LinkedIn getrennt");
+    toast.success("LinkedIn disconnected");
   };
 
   if (!authReady || !userId) {
@@ -342,13 +342,13 @@ function App() {
       <header className="border-b bg-card/60 backdrop-blur sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <div>
-            <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planer</h1>
-            <p className="text-sm text-muted-foreground">PDF hochladen · Automatisch übersetzen · Geplant veröffentlichen</p>
+            <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planner</h1>
+            <p className="text-sm text-muted-foreground">Upload PDF · Auto-translate · Schedule and publish</p>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground hidden sm:inline">{userEmail}</span>
             <Button variant="outline" size="sm" onClick={() => setShowSettings((s) => !s)}>
-              <SettingsIcon /> Einstellungen
+              <SettingsIcon /> Settings
             </Button>
             <Button variant="ghost" size="sm" onClick={logout}>
               <LogOut />
@@ -361,39 +361,39 @@ function App() {
         {showSettings && (
           <Card className="p-6 space-y-5">
             <div className="space-y-3">
-              <h2 className="font-semibold">LinkedIn-Verbindung</h2>
+              <h2 className="font-semibold">LinkedIn connection</h2>
               {liToken && liAuthor ? (
                 <div className="rounded-md border p-4 space-y-2">
                   <div className="text-sm">
-                    Verbunden als <span className="font-medium">{liConnectedName || liAuthor}</span>
+                    Connected as <span className="font-medium">{liConnectedName || liAuthor}</span>
                   </div>
                   {liExpiresAt && (
                     <div className="text-xs text-muted-foreground">
-                      Token gültig bis: {new Date(liExpiresAt).toLocaleString("de-DE")} (wird automatisch erneuert)
+                      Token valid until: {new Date(liExpiresAt).toLocaleString("en-US")} (refreshed automatically)
                     </div>
                   )}
                   <div className="flex gap-2 pt-1">
                     <Button size="sm" variant="outline" onClick={connectLinkedIn} disabled={liConnecting}>
-                      Neu verbinden
+                      Reconnect
                     </Button>
-                    <Button size="sm" variant="ghost" onClick={disconnectLinkedIn}>Trennen</Button>
+                    <Button size="sm" variant="ghost" onClick={disconnectLinkedIn}>Disconnect</Button>
                   </div>
                 </div>
               ) : (
                 <div className="rounded-md border p-4 space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    Verbinde dein LinkedIn-Konto per OAuth. Tokens werden automatisch erneuert.
+                    Connect your LinkedIn account via OAuth. Tokens are refreshed automatically.
                   </p>
                   <Button onClick={connectLinkedIn} disabled={liConnecting}>
                     {liConnecting ? <Loader2 className="animate-spin" /> : null}
-                    Mit LinkedIn verbinden
+                    Connect with LinkedIn
                   </Button>
                 </div>
               )}
             </div>
             <div className="space-y-3">
-              <h2 className="font-semibold">Caption-Sprache</h2>
-              <p className="text-sm text-muted-foreground">Zielsprache für die übersetzten Posts (originale englische Captions bleiben gespeichert).</p>
+              <h2 className="font-semibold">Caption language</h2>
+              <p className="text-sm text-muted-foreground">Target language for the translated posts (the original English captions are always kept).</p>
               <Select value={lang} onValueChange={(v) => setLang(v)}>
                 <SelectTrigger className="w-full sm:w-72"><SelectValue /></SelectTrigger>
                 <SelectContent>
@@ -403,26 +403,26 @@ function App() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={saveSettings}>Speichern</Button>
+            <Button onClick={saveSettings}>Save</Button>
           </Card>
         )}
 
         <Card className="p-6 bg-accent/30 border-dashed">
           <h2 className="font-semibold mb-3 flex items-center gap-2">
             <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">?</span>
-            So funktioniert's
+            How it works
           </h2>
           <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
             <li>
               <span className="text-foreground font-medium">
                 <LinkedInGuideDialog />:
               </span>{" "}
-              Öffne <em>Einstellungen</em> oben rechts und klicke auf <em>Mit LinkedIn verbinden</em>. Im neuen Tab anmelden und Berechtigungen erteilen.
+              Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in in the new tab and grant the permissions.
             </li>
-            <li><span className="text-foreground font-medium">Caption-Sprache wählen:</span> In den Einstellungen festlegen, ob Posts auf Deutsch oder Englisch veröffentlicht werden.</li>
-            <li><span className="text-foreground font-medium">PDF hochladen:</span> Content-PDF unten per Drag &amp; Drop oder Auswahl hochladen. Die KI extrahiert Captions, Bilder, Datum, Uhrzeit und Hashtags und übersetzt automatisch.</li>
-            <li><span className="text-foreground font-medium">Posts prüfen &amp; bearbeiten:</span> Jeden Post unten kontrollieren, Text/CTA/Hashtags und Veröffentlichungszeitpunkt bei Bedarf anpassen.</li>
-            <li><span className="text-foreground font-medium">Veröffentlichen:</span> Posts werden zum geplanten Zeitpunkt automatisch publiziert — oder per <em>Jetzt senden</em> sofort.</li>
+            <li><span className="text-foreground font-medium">Choose caption language:</span> In Settings, pick the target language for your published posts.</li>
+            <li><span className="text-foreground font-medium">Upload PDF:</span> Drag &amp; drop or pick your content PDF below. The AI extracts captions, images, date, time and hashtags and translates automatically.</li>
+            <li><span className="text-foreground font-medium">Review &amp; edit posts:</span> Check each post below and adjust text, CTA, hashtags or scheduled time if needed.</li>
+            <li><span className="text-foreground font-medium">Publish:</span> Posts go live automatically at the scheduled time — or instantly with <em>Send now</em>.</li>
           </ol>
         </Card>
 
@@ -430,7 +430,7 @@ function App() {
 
         {batches.length > 0 && (
           <section>
-            <h2 className="font-semibold mb-3">PDF-Uploads</h2>
+            <h2 className="font-semibold mb-3">PDF uploads</h2>
             <div className="grid gap-2">
               {batches.map((b) => (
                 <Card key={b.id} className="px-4 py-3 flex items-center justify-between">
@@ -439,7 +439,7 @@ function App() {
                     <div>
                       <div className="text-sm font-medium">{b.name}</div>
                       <div className="text-xs text-muted-foreground">
-                        {new Date(b.created_at).toLocaleString("de-DE")} · {b.status}
+                        {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
                         {b.error && ` · ${b.error}`}
                       </div>
                     </div>
@@ -453,11 +453,11 @@ function App() {
 
         <section>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Geplante Posts ({posts.length})</h2>
+            <h2 className="font-semibold">Scheduled posts ({posts.length})</h2>
           </div>
           {posts.length === 0 ? (
             <Card className="p-12 text-center text-muted-foreground">
-              Noch keine Posts. Lade eine PDF hoch um zu starten.
+              No posts yet. Upload a PDF to get started.
             </Card>
           ) : (
             <div className="grid gap-4">
@@ -490,13 +490,13 @@ function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: Fil
           {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
         </div>
         <div>
-          <h3 className="font-medium">Neue Content-PDF hochladen</h3>
-          <p className="text-sm text-muted-foreground">KI extrahiert Captions, Datum, Uhrzeit, Hashtags und übersetzt automatisch ins Deutsche.</p>
+          <h3 className="font-medium">Upload a new content PDF</h3>
+          <p className="text-sm text-muted-foreground">AI extracts captions, date, time and hashtags and translates automatically.</p>
         </div>
         <label>
           <input type="file" accept="application/pdf" className="hidden" disabled={uploading}
             onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-          <Button asChild disabled={uploading}><span>{uploading ? "Wird verarbeitet..." : "PDF auswählen"}</span></Button>
+          <Button asChild disabled={uploading}><span>{uploading ? "Processing..." : "Choose PDF"}</span></Button>
         </label>
       </div>
     </Card>
@@ -523,8 +523,8 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
   };
 
   const images = (post.post_images || []).slice().sort((a, b) => a.sort_order - b.sort_order);
-  const showDe = lang === "de" || lang === "both";
-  const showEn = lang === "en" || lang === "both";
+  const showTranslated = lang !== "en";
+  const showOriginal = lang === "en" || lang === "both";
 
   return (
     <Card className="p-5 space-y-3">
@@ -546,17 +546,17 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
           ))}
         </div>
       ) : (
-        <div className="text-xs text-muted-foreground flex items-center gap-1"><ImageIcon className="h-3 w-3" /> Keine Bilder</div>
+        <div className="text-xs text-muted-foreground flex items-center gap-1"><ImageIcon className="h-3 w-3" /> No images</div>
       )}
 
       {editing ? (
         <div className="space-y-3">
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Caption (DE)</label>
+            <label className="text-xs font-medium text-muted-foreground">Translated caption</label>
             <Textarea rows={6} value={caption} onChange={(e) => setCaption(e.target.value)} />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">CTA (DE)</label>
+            <label className="text-xs font-medium text-muted-foreground">Translated CTA</label>
             <Input value={cta} onChange={(e) => setCta(e.target.value)} />
           </div>
           <div>
@@ -564,26 +564,26 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
             <Input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="BoConcept InteriorDesign" />
           </div>
           <div>
-            <label className="text-xs font-medium text-muted-foreground">Veröffentlichen am</label>
+            <label className="text-xs font-medium text-muted-foreground">Publish at</label>
             <Input type="datetime-local" value={publishAt} onChange={(e) => setPublishAt(e.target.value)} />
           </div>
           <div className="flex gap-2">
-            <Button size="sm" onClick={save}>Speichern</Button>
-            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Abbrechen</Button>
+            <Button size="sm" onClick={save}>Save</Button>
+            <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
           </div>
         </div>
       ) : (
         <>
-          {showDe && (
+          {showTranslated && (
             <div className="space-y-1">
-              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Deutsch</div>}
+              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Translated</div>}
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{post.translated_caption}</p>
               {post.translated_cta && <p className="text-sm font-medium text-primary">{post.translated_cta}</p>}
             </div>
           )}
-          {showEn && (
+          {showOriginal && (
             <div className="space-y-1">
-              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">English</div>}
+              {lang === "both" && <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Original (English)</div>}
               <p className="text-sm whitespace-pre-wrap leading-relaxed">{post.original_caption}</p>
               {post.original_cta && <p className="text-sm font-medium text-primary">{post.original_cta}</p>}
             </div>
@@ -602,11 +602,11 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
       <div className="flex items-center justify-between pt-2 border-t">
         <div className="text-xs text-muted-foreground flex items-center gap-1">
           <Calendar className="h-3 w-3" />
-          {post.publish_at ? new Date(post.publish_at).toLocaleString("de-DE") : "Kein Datum"}
+          {post.publish_at ? new Date(post.publish_at).toLocaleString("en-US") : "No date"}
         </div>
         <div className="flex gap-1">
-          <Button size="sm" variant="ghost" onClick={() => setEditing((e) => !e)}>Bearbeiten</Button>
-          <Button size="sm" variant="outline" onClick={onPublish}><Send /> Jetzt senden</Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing((e) => !e)}>Edit</Button>
+          <Button size="sm" variant="outline" onClick={onPublish}><Send /> Send now</Button>
           <Button size="sm" variant="ghost" onClick={onDelete}><Trash2 /></Button>
         </div>
       </div>
@@ -619,9 +619,9 @@ function PostCard({ post, lang, onPublish, onDelete, onUpdate }: {
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string }> = {
-    scheduled: { label: "Geplant", cls: "bg-accent text-accent-foreground" },
-    published: { label: "Veröffentlicht", cls: "bg-success text-success-foreground" },
-    failed: { label: "Fehler", cls: "bg-destructive text-destructive-foreground" },
+    scheduled: { label: "Scheduled", cls: "bg-accent text-accent-foreground" },
+    published: { label: "Published", cls: "bg-success text-success-foreground" },
+    failed: { label: "Failed", cls: "bg-destructive text-destructive-foreground" },
   };
   const m = map[status] || { label: status, cls: "bg-muted" };
   return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${m.cls}`}>{m.label}</span>;

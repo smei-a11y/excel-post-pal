@@ -47,10 +47,10 @@ function LoginPage() {
       return;
     }
     if (data.session) {
-      toast.success("Konto erstellt");
+      toast.success("Account created");
       navigate({ to: "/" });
     } else {
-      toast.success("Konto erstellt – bitte E-Mail bestätigen.");
+      toast.success("Account created — please confirm your email.");
     }
   };
 
@@ -58,7 +58,7 @@ function LoginPage() {
     setLoading(true);
     const result = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
     if (result.error) {
-      toast.error(result.error.message || "Google Login fehlgeschlagen");
+      toast.error(result.error.message || "Google login failed");
       setLoading(false);
       return;
     }
@@ -71,28 +71,28 @@ function LoginPage() {
       <Toaster richColors position="top-right" />
       <Card className="w-full max-w-md p-8 space-y-6">
         <div className="space-y-1">
-          <h1 className="text-2xl font-semibold tracking-tight">Willkommen</h1>
-          <p className="text-sm text-muted-foreground">LinkedIn Content Planer · BoConcept</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome</h1>
+          <p className="text-sm text-muted-foreground">LinkedIn Content Planner</p>
         </div>
 
         <Tabs defaultValue="login" className="w-full">
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="login">Anmelden</TabsTrigger>
-            <TabsTrigger value="signup">Registrieren</TabsTrigger>
+            <TabsTrigger value="login">Sign in</TabsTrigger>
+            <TabsTrigger value="signup">Sign up</TabsTrigger>
           </TabsList>
 
           <TabsContent value="login">
             <form onSubmit={onLogin} className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="login-email">E-Mail</Label>
+                <Label htmlFor="login-email">Email</Label>
                 <Input id="login-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="login-password">Passwort</Label>
+                <Label htmlFor="login-password">Password</Label>
                 <Input id="login-password" type="password" required value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="animate-spin" /> : "Anmelden"}
+                {loading ? <Loader2 className="animate-spin" /> : "Sign in"}
               </Button>
             </form>
           </TabsContent>
@@ -100,15 +100,15 @@ function LoginPage() {
           <TabsContent value="signup">
             <form onSubmit={onSignup} className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label htmlFor="signup-email">E-Mail</Label>
+                <Label htmlFor="signup-email">Email</Label>
                 <Input id="signup-email" type="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="signup-password">Passwort</Label>
+                <Label htmlFor="signup-password">Password</Label>
                 <Input id="signup-password" type="password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? <Loader2 className="animate-spin" /> : "Konto erstellen"}
+                {loading ? <Loader2 className="animate-spin" /> : "Create account"}
               </Button>
             </form>
           </TabsContent>
@@ -117,12 +117,12 @@ function LoginPage() {
         <div className="relative">
           <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">oder</span>
+            <span className="bg-card px-2 text-muted-foreground">or</span>
           </div>
         </div>
 
         <Button variant="outline" className="w-full" onClick={onGoogle} disabled={loading}>
-          Mit Google anmelden
+          Sign in with Google
         </Button>
       </Card>
     </div>
