@@ -23,37 +23,78 @@ const LANG_NAMES = {
   et: "Estnisch", lv: "Lettisch", lt: "Litauisch", ga: "Irisch", mt: "Maltesisch",
 };
 
-console.log(`[worker] starting — polling every ${POLL_INTERVAL_MS}ms`);
+console.log(`[worker] starting — HTTP trigger mode`);
 
-// Simple HTTP server so Render can health-check (Web Service requires open port)
-const port = parseInt(process.env.PORT || "3000", 10);
+const port = parseInt(process.env.PORT || "8080", 10);
 const http = await import("http");
-http.createServer((_req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("ok");
-}).listen(port, () => console.log(`[worker] health server on :${port}`));
 
-let busy = false;
-
-async function tick() {
-  if (busy) return;
-  busy = true;
-  try {
-    const { data, error } = await supabase.rpc("claim_next_batch");
-    if (error) { console.error("[claim] error", error); return; }
-    const batch = Array.isArray(data) ? data[0] : data;
-    if (!batch) return;
-    console.log(`[worker] picked batch ${batch.id} (${batch.source_filename})`);
-    await processBatch(batch);
-  } catch (e) {
-    console.error("[tick] unexpected", e);
-  } finally {
-    busy = false;
-  }
+async function readJson(req) {
+  return new Promise((resolve, reject) => {
+    let body = "";
+    req.on("data", (c) => (body += c));
+    req.on("end", () => {
+      try { resolve(body ? JSON.parse(body) : {}); } catch (e) { reject(e); }
+    });
+    req.on("error", reject);
+  });
 }
 
-setInterval(tick, POLL_INTERVAL_MS);
-tick();
+http.createServer(async (req, res) => {
+  // Health check
+  if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("ok");
+    return;
+  }
+
+  // Process trigger
+  if (req.method === "POST" && req.url === "/process") {
+    const auth = req.headers["authorization"] || "";
+    const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+    if (token !== WORKER_SHARED_SECRET) {
+      res.writeHead(401, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ error: "unauthorized" }));
+      return;
+    }
+    let payload;
+    try { payload = await readJson(req); } catch {
+      res.writeHead(400); res.end(JSON.stringify({ error: "invalid json" })); return;
+    }
+    const batchId = payload?.batchId;
+    if (!batchId || typeof batchId !== "string") {
+      res.writeHead(400); res.end(JSON.stringify({ error: "batchId required" })); return;
+    }
+
+    // Fire-and-forget: respond 202 immediately
+    res.writeHead(202, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ accepted: true, batchId }));
+
+    // Process in background
+    handleBatchById(batchId).catch((e) => console.error("[handle] unexpected", e));
+    return;
+  }
+
+  res.writeHead(404); res.end("not found");
+}).listen(port, () => console.log(`[worker] HTTP server listening on :${port}`));
+
+async function handleBatchById(batchId) {
+  console.log(`[worker] received trigger for batch ${batchId}`);
+  // Atomically claim: only proceed if status is 'queued', set to 'processing'
+  const { data: claimed, error: claimErr } = await supabase
+    .from("batches")
+    .update({ status: "processing" })
+    .eq("id", batchId)
+    .eq("status", "queued")
+    .select()
+    .maybeSingle();
+  if (claimErr) { console.error("[claim] error", claimErr); return; }
+  if (!claimed) {
+    console.log(`[worker] batch ${batchId} not in 'queued' state, skipping`);
+    return;
+  }
+  await processBatch(claimed);
+}
+
 
 async function processBatch(batch) {
   const batchId = batch.id;
