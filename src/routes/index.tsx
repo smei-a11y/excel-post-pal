@@ -254,15 +254,15 @@ function App() {
       updated_at: new Date().toISOString(),
     }, { onConflict: "user_id" });
     if (error) toast.error(error.message);
-    else toast.success("Einstellungen gespeichert");
+    else toast.success("Settings saved");
   };
 
   const publishNow = async (postId: string) => {
-    const t = toast.loading("Wird veröffentlicht...");
+    const t = toast.loading("Publishing...");
     const { data, error } = await supabase.functions.invoke("publish-due-posts", { body: { postId } });
     toast.dismiss(t);
     if (error) toast.error(error.message);
-    else toast.success("Gesendet: " + JSON.stringify(data?.results?.[0] || {}));
+    else toast.success("Sent: " + JSON.stringify(data?.results?.[0] || {}));
     load();
   };
 
