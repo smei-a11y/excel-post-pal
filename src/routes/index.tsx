@@ -468,7 +468,97 @@ function App() {
           )}
         </section>
       </main>
+      <FeedbackFooter />
     </div>
+  );
+}
+
+function FeedbackFooter() {
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const submit = async () => {
+    if (!message.trim()) {
+      toast.error("Please enter a message");
+      return;
+    }
+    if (message.length > 2000) {
+      toast.error("Message too long (max 2000 chars)");
+      return;
+    }
+    setSending(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { toast.error("Please sign in"); setSending(false); return; }
+      const res = await fetch("/lovable/email/transactional/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          templateName: "feedback",
+          recipientEmail: "smei@boconcept.de",
+          templateData: {
+            fromEmail: email.trim() || session.user.email || "anonymous",
+            message: message.trim(),
+            source: window.location.hostname,
+          },
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Request failed (${res.status})`);
+      }
+      toast.success("Thanks! Your feedback was sent.");
+      setEmail(""); setMessage("");
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to send feedback");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <footer className="border-t bg-card/40 mt-12">
+      <div className="max-w-6xl mx-auto px-6 py-10 grid gap-8 md:grid-cols-2">
+        <div className="space-y-2">
+          <h3 className="font-semibold">Contact</h3>
+          <p className="text-sm text-muted-foreground">
+            For direct inquiries, email us at{" "}
+            <a href="mailto:contact@linkedincontentgenerator.com" className="underline hover:text-primary">
+              contact@linkedincontentgenerator.com
+            </a>
+            .
+          </p>
+        </div>
+        <div className="space-y-3">
+          <h3 className="font-semibold">Send feedback or suggestions</h3>
+          <Input
+            type="email"
+            placeholder="Your email (optional)"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            maxLength={255}
+          />
+          <Textarea
+            placeholder="Your suggestion or comment..."
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={4}
+            maxLength={2000}
+          />
+          <Button onClick={submit} disabled={sending}>
+            {sending ? <Loader2 className="animate-spin" /> : <Send />}
+            {sending ? "Sending..." : "Send feedback"}
+          </Button>
+        </div>
+      </div>
+      <div className="border-t py-4 text-center text-xs text-muted-foreground">
+        © {new Date().getFullYear()} LinkedIn Content Planner
+      </div>
+    </footer>
   );
 }
 
