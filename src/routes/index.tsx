@@ -155,7 +155,7 @@ function App() {
 
   const [batches, setBatches] = useState<Batch[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
-  const [lang, setLang] = useState<Lang>("de");
+  const [lang, setLang] = useState<Lang>("en");
   const [liToken, setLiToken] = useState("");
   const [liAuthor, setLiAuthor] = useState("");
   const [liConnectedName, setLiConnectedName] = useState<string>("");
