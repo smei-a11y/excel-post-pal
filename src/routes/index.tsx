@@ -611,18 +611,23 @@ function App() {
             </div>
             <div className="grid gap-px bg-border border border-border">
               {batches.map((b) => (
-                <div key={b.id} className="px-6 py-5 bg-background flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <StatusIcon status={b.status} />
-                    <div>
-                      <div className="text-sm font-medium">{b.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
-                        {b.error && ` · ${b.error}`}
+                <div key={b.id} className="px-6 py-5 bg-background flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <StatusIcon status={b.status} />
+                      <div>
+                        <div className="text-sm font-medium">{b.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
+                          {b.error && ` · ${b.error}`}
+                        </div>
                       </div>
                     </div>
+                    <Button variant="ghost" size="icon" onClick={() => deleteBatch(b.id)}><Trash2 /></Button>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => deleteBatch(b.id)}><Trash2 /></Button>
+                  {(b.status === "queued" || b.status === "processing") && (
+                    <BatchProgress startedAt={b.created_at} status={b.status} />
+                  )}
                 </div>
               ))}
             </div>
@@ -937,6 +942,34 @@ function StatusIcon({ status }: { status: string }) {
   if (status === "error") return <AlertCircle className="h-5 w-5 text-destructive" />;
   if (status === "processing") return <Loader2 className="h-5 w-5 animate-spin text-primary" />;
   return <Clock className="h-5 w-5 text-muted-foreground" />;
+}
+
+function BatchProgress({ startedAt, status }: { startedAt: string; status: string }) {
+  const ESTIMATED_MS = 4 * 60 * 1000; // ~4 min expected
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsed = Math.max(0, now - new Date(startedAt).getTime());
+  const pct = Math.min(95, (elapsed / ESTIMATED_MS) * 100);
+  const mm = Math.floor(elapsed / 60000);
+  const ss = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, "0");
+  const label = status === "queued" ? "Waiting for worker" : "Extracting & translating";
+  return (
+    <div className="space-y-1.5 pl-9">
+      <div className="h-[2px] bg-border overflow-hidden">
+        <div
+          className="h-full bg-foreground transition-all duration-1000 ease-linear"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+        <span>{label}</span>
+        <span>{mm}:{ss} elapsed · ~4 min</span>
+      </div>
+    </div>
+  );
 }
 
 function toLocalInput(iso: string) {
