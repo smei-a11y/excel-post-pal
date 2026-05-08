@@ -261,6 +261,14 @@ function App() {
 
   const load = useCallback(async () => {
     if (!userId) return;
+    // Watchdog: mark batches stuck in "processing" for >30min as error
+    const cutoff = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+    await supabase
+      .from("batches")
+      .update({ status: "error", error: "Worker timed out (>30min). The PPTX may be too large or the worker crashed. Try a smaller file." })
+      .eq("user_id", userId)
+      .eq("status", "processing")
+      .lt("created_at", cutoff);
     const [b, p, s] = await Promise.all([
       supabase.from("batches").select("*").order("created_at", { ascending: false }),
       supabase.from("posts").select("*, post_images(id, public_url, sort_order)").order("publish_at", { ascending: true }),
