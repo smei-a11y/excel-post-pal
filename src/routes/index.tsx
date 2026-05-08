@@ -541,31 +541,6 @@ function App() {
           </Card>
         )}
 
-        {/* Hero upload section — centered, generous whitespace */}
-        <section className="text-center space-y-10">
-          <div className="space-y-6 max-w-2xl mx-auto">
-            <h2 className="font-serif text-4xl sm:text-5xl leading-[1.1] tracking-tight text-foreground">
-              Upload. Translate. Publish.
-            </h2>
-            <p className="text-sm text-muted-foreground leading-relaxed max-w-lg mx-auto">
-              A quiet workspace for transforming PPTX content plans into scheduled,
-              ready-to-publish LinkedIn posts.
-            </p>
-          </div>
-
-          <UploadZone
-            uploading={uploading}
-            onFile={onUpload}
-            pct={uploadPct}
-            bytes={uploadBytes}
-            total={uploadTotal}
-            paused={uploadPaused}
-            onPause={pauseUpload}
-            onResume={resumeUpload}
-            onCancel={cancelUpload}
-          />
-        </section>
-
         {/* How it works — minimalist numbered list */}
         <section className="space-y-10">
           <div className="space-y-3">
@@ -601,6 +576,31 @@ function App() {
               </li>
             ))}
           </ol>
+        </section>
+
+        {/* Hero upload section — centered, generous whitespace */}
+        <section className="text-center space-y-10">
+          <div className="space-y-6 max-w-2xl mx-auto">
+            <h2 className="font-serif text-4xl sm:text-5xl leading-[1.1] tracking-tight text-foreground">
+              Upload. Translate. Publish.
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-lg mx-auto">
+              A quiet workspace for transforming PPTX content plans into scheduled,
+              ready-to-publish LinkedIn posts.
+            </p>
+          </div>
+
+          <UploadZone
+            uploading={uploading}
+            onFile={onUpload}
+            pct={uploadPct}
+            bytes={uploadBytes}
+            total={uploadTotal}
+            paused={uploadPaused}
+            onPause={pauseUpload}
+            onResume={resumeUpload}
+            onCancel={cancelUpload}
+          />
         </section>
 
         {batches.length > 0 && (
