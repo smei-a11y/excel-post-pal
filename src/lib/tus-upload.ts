@@ -2,6 +2,19 @@ import * as tus from "tus-js-client";
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+function getStorageEndpoint() {
+  const url = new URL(SUPABASE_URL);
+  if (url.hostname.endsWith(".supabase.co")) {
+    url.hostname = url.hostname.replace(".supabase.co", ".storage.supabase.co");
+  }
+  return `${url.origin}/storage/v1/upload/resumable`;
+}
+
+function isCompactJwt(token?: string | null) {
+  return !!token && token.split(".").length === 3;
+}
 
 export type TusHandle = {
   pause: () => void;
@@ -22,23 +35,40 @@ export async function tusUpload({
   onProgress?: (pct: number, bytesUploaded: number, bytesTotal: number) => void;
   onHandle?: (h: TusHandle) => void;
 }): Promise<void> {
-  const { data: sessionData } = await supabase.auth.getSession();
-  if (!sessionData.session?.access_token) throw new Error("Not authenticated");
-
-  // Always fetch a fresh token per request — supabase auto-refreshes sessions,
-  // and large uploads can outlive the 1h token lifetime.
+  // Always validate/refresh before each request. getSession() can return a
+  // locally cached token; Storage rejects malformed cached tokens as
+  // "Invalid Compact JWS", so we verify the JWT shape and refresh if needed.
   const getFreshToken = async () => {
-    const { data } = await supabase.auth.getSession();
-    return data.session?.access_token;
+    let { data, error } = await supabase.auth.getSession();
+    let token = data.session?.access_token;
+    const expiresSoon = data.session?.expires_at
+      ? data.session.expires_at * 1000 - Date.now() < 2 * 60 * 1000
+      : false;
+
+    if (error || !isCompactJwt(token) || expiresSoon) {
+      const refreshed = await supabase.auth.refreshSession();
+      data = refreshed.data;
+      error = refreshed.error;
+      token = data.session?.access_token;
+    }
+
+    if (error || !isCompactJwt(token)) {
+      throw new Error("Deine Sitzung ist abgelaufen. Bitte einmal neu einloggen und denselben Upload erneut starten.");
+    }
+
+    return token;
   };
+
+  const initialToken = await getFreshToken();
 
   return new Promise<void>((resolve, reject) => {
     const upload = new tus.Upload(file, {
-      endpoint: `${SUPABASE_URL}/storage/v1/upload/resumable`,
+      endpoint: getStorageEndpoint(),
       // Long retry window — survives WLAN drops, sleep, brief offline periods.
       retryDelays: [0, 2000, 5000, 10000, 20000, 30000, 60000, 60000, 60000],
       headers: {
-        authorization: `Bearer ${sessionData.session!.access_token}`,
+        Authorization: `Bearer ${initialToken}`,
+        apikey: SUPABASE_PUBLISHABLE_KEY,
         "x-upsert": "true",
       },
       // Do not send the first 6 MB together with the upload-creation request.
@@ -67,7 +97,8 @@ export async function tusUpload({
       },
       onBeforeRequest: async (req) => {
         const t = await getFreshToken();
-        if (t) req.setHeader("authorization", `Bearer ${t}`);
+        req.setHeader("Authorization", `Bearer ${t}`);
+        req.setHeader("apikey", SUPABASE_PUBLISHABLE_KEY);
       },
       onError: (err) => reject(err),
       onProgress: (bytesUploaded, bytesTotal) => {
