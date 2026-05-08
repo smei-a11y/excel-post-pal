@@ -197,22 +197,12 @@ async function processBatch(batch, captionLanguage, downloadUrl) {
     const args = await aiRes.json();
     console.log(`[batch ${batchId}] AI returned ${args.posts.length} posts`);
 
-    // Pass 2: per post, stream media one at a time
+    // Pass 2: per post, stream-upload media one at a time (no base64, no buffer)
     for (const p of args.posts) {
       const slide = slides.find((s) => s.idx === p.pdf_page);
-      const media = [];
-      if (slide) {
-        for (const mPath of slide.mediaPaths) {
-          const ext = (mPath.split(".").pop() || "").toLowerCase();
-          const ct = mimeFromExt(ext);
-          if (!ct) continue;
-          const entry = entries.get(mPath);
-          if (!entry) continue;
-          const buf = await readEntryToBuffer(entry);
-          media.push({ base64: buf.toString("base64"), ext, contentType: ct });
-        }
-      }
-      await callApi("create-post", {
+
+      // 1. Create post (without media)
+      const createRes = await callApi("create-post", {
         post: {
           user_id: userId,
           batch_id: batchId,
@@ -227,10 +217,52 @@ async function processBatch(batch, captionLanguage, downloadUrl) {
           link_url: p.link_url,
           publish_at: p.publish_at,
         },
-        media,
+        media: [],
       });
-      // help GC: drop refs
-      media.length = 0;
+      const postId = createRes.postId;
+
+      // 2. For each media: presign → stream PUT to storage → register
+      if (slide) {
+        let i = 0;
+        for (const mPath of slide.mediaPaths) {
+          const ext = (mPath.split(".").pop() || "").toLowerCase();
+          const ct = mimeFromExt(ext);
+          if (!ct) continue;
+          const entry = entries.get(mPath);
+          if (!entry) continue;
+
+          const presign = await callApi("presign-upload", {
+            userId, batchId, postId, index: i, ext,
+          });
+
+          const stream = await entry.openReadStream();
+          const size = entry.uncompressedSize;
+          console.log(`[batch ${batchId}] uploading ${mPath} (${(size / 1024 / 1024).toFixed(1)} MB) → ${presign.path}`);
+
+          const upRes = await fetch(presign.uploadUrl, {
+            method: "PUT",
+            headers: {
+              "content-type": ct,
+              "content-length": String(size),
+              "x-upsert": "true",
+            },
+            body: Readable.toWeb(stream),
+            duplex: "half",
+          });
+          if (!upRes.ok) {
+            const t = await upRes.text().catch(() => "");
+            throw new Error(`storage upload failed ${upRes.status}: ${t}`);
+          }
+
+          await callApi("register-media", {
+            userId, postId,
+            path: presign.path,
+            publicUrl: presign.publicUrl,
+            sortOrder: i,
+          });
+          i++;
+        }
+      }
     }
 
     await callApi("finish-batch", { batchId, status: "ready" });
