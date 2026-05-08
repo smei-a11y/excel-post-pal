@@ -466,12 +466,9 @@ function App() {
       <Toaster richColors position="top-right" />
       <header className="border-b border-border bg-background sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-8 sm:px-12 py-6 flex items-center justify-between">
-          <div className="space-y-1">
-            <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">
-              Linkedin · Content Studio
-            </div>
+          <div>
             <h1 className="font-serif text-2xl font-normal tracking-tight text-foreground">
-              Content Planner
+              LinkedIn PPTX Content Planner
             </h1>
           </div>
           <div className="flex items-center gap-3">
