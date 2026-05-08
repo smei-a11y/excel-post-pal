@@ -1,18 +1,15 @@
-import { createClient } from "@supabase/supabase-js";
 import JSZip from "jszip";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const WORKER_SHARED_SECRET = process.env.WORKER_SHARED_SECRET;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !WORKER_SHARED_SECRET) {
-  console.error("Missing required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WORKER_SHARED_SECRET");
+if (!SUPABASE_URL || !WORKER_SHARED_SECRET) {
+  console.error("Missing required env: SUPABASE_URL, WORKER_SHARED_SECRET");
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false, autoRefreshToken: false },
-});
+const API_BASE = `${SUPABASE_URL}/functions/v1`;
+const authHeaders = { Authorization: `Bearer ${WORKER_SHARED_SECRET}`, "Content-Type": "application/json" };
 
 const LANG_NAMES = {
   de: "Deutsch", en: "Englisch", fr: "Französisch", es: "Spanisch", it: "Italienisch",
@@ -22,7 +19,7 @@ const LANG_NAMES = {
   et: "Estnisch", lv: "Lettisch", lt: "Litauisch", ga: "Irisch", mt: "Maltesisch",
 };
 
-console.log(`[worker] starting — HTTP trigger mode`);
+console.log(`[worker] starting — HTTP trigger mode (gateway-only)`);
 
 const port = parseInt(process.env.PORT || "8080", 10);
 const http = await import("http");
@@ -31,29 +28,34 @@ async function readJson(req) {
   return new Promise((resolve, reject) => {
     let body = "";
     req.on("data", (c) => (body += c));
-    req.on("end", () => {
-      try { resolve(body ? JSON.parse(body) : {}); } catch (e) { reject(e); }
-    });
+    req.on("end", () => { try { resolve(body ? JSON.parse(body) : {}); } catch (e) { reject(e); } });
     req.on("error", reject);
   });
 }
 
-http.createServer(async (req, res) => {
-  // Health check
-  if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
-    res.writeHead(200, { "Content-Type": "text/plain" });
-    res.end("ok");
-    return;
+async function callApi(action, payload) {
+  const res = await fetch(`${API_BASE}/worker-api`, {
+    method: "POST",
+    headers: authHeaders,
+    body: JSON.stringify({ action, ...payload }),
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`worker-api ${action} ${res.status}: ${t}`);
   }
+  return res.json();
+}
 
-  // Process trigger
+http.createServer(async (req, res) => {
+  if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
+    res.writeHead(200, { "Content-Type": "text/plain" }); res.end("ok"); return;
+  }
   if (req.method === "POST" && req.url === "/process") {
     const auth = req.headers["authorization"] || "";
     const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
     if (token !== WORKER_SHARED_SECRET) {
       res.writeHead(401, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "unauthorized" }));
-      return;
+      res.end(JSON.stringify({ error: "unauthorized" })); return;
     }
     let payload;
     try { payload = await readJson(req); } catch {
@@ -63,52 +65,35 @@ http.createServer(async (req, res) => {
     if (!batchId || typeof batchId !== "string") {
       res.writeHead(400); res.end(JSON.stringify({ error: "batchId required" })); return;
     }
-
-    // Fire-and-forget: respond 202 immediately
     res.writeHead(202, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ accepted: true, batchId }));
-
-    // Process in background
     handleBatchById(batchId).catch((e) => console.error("[handle] unexpected", e));
     return;
   }
-
   res.writeHead(404); res.end("not found");
 }).listen(port, () => console.log(`[worker] HTTP server listening on :${port}`));
 
 async function handleBatchById(batchId) {
   console.log(`[worker] received trigger for batch ${batchId}`);
-  // Atomically claim: only proceed if status is 'queued', set to 'processing'
-  const { data: claimed, error: claimErr } = await supabase
-    .from("batches")
-    .update({ status: "processing" })
-    .eq("id", batchId)
-    .eq("status", "queued")
-    .select()
-    .maybeSingle();
-  if (claimErr) { console.error("[claim] error", claimErr); return; }
-  if (!claimed) {
-    console.log(`[worker] batch ${batchId} not in 'queued' state, skipping`);
-    return;
-  }
-  await processBatch(claimed);
+  let claim;
+  try { claim = await callApi("claim-batch", { batchId }); }
+  catch (e) { console.error("[claim] error", e.message); return; }
+  if (!claim.claimed) { console.log(`[worker] batch ${batchId} not in 'queued', skipping`); return; }
+  await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
 }
 
-
-async function processBatch(batch) {
+async function processBatch(batch, captionLanguage, downloadUrl) {
   const batchId = batch.id;
   const userId = batch.user_id;
   try {
-    const { data: settings } = await supabase
-      .from("app_settings").select("caption_language").eq("user_id", userId).maybeSingle();
-    const rawLang = settings?.caption_language || "de";
+    const rawLang = captionLanguage || "de";
     const targetCode = rawLang === "both" ? "de" : (rawLang === "en" ? "en" : rawLang);
     const targetLangName = LANG_NAMES[targetCode] || "Deutsch";
 
     console.log(`[batch ${batchId}] downloading ${batch.pdf_path}`);
-    const { data: fileBlob, error: dlErr } = await supabase.storage.from("post-pdfs").download(batch.pdf_path);
-    if (dlErr || !fileBlob) throw new Error("download failed: " + dlErr?.message);
-    const fileBuf = Buffer.from(await fileBlob.arrayBuffer());
+    const dlRes = await fetch(downloadUrl);
+    if (!dlRes.ok) throw new Error(`download failed: ${dlRes.status}`);
+    const fileBuf = Buffer.from(await dlRes.arrayBuffer());
     console.log(`[batch ${batchId}] downloaded ${(fileBuf.length / 1024 / 1024).toFixed(1)} MB`);
 
     const filename = (batch.source_filename || batch.pdf_path || "").toLowerCase();
@@ -119,48 +104,36 @@ async function processBatch(batch) {
     console.log(`[batch ${batchId}] extracted ${posts.length} posts`);
 
     for (const p of posts) {
-      const { data: row, error } = await supabase.from("posts").insert({
-        user_id: userId,
-        batch_id: batchId,
-        position: p.position,
-        focus: p.focus,
-        format: p.format,
-        original_caption: p.caption,
-        original_cta: p.cta,
-        translated_caption: p.translated_caption,
-        translated_cta: p.translated_cta,
-        hashtags: p.hashtags,
-        link_url: p.link_url,
-        publish_at: p.publish_at,
-      }).select().single();
-      if (error || !row) { console.error("insert error", error); continue; }
-
-      const media = mediaPerPage.get(p.pdf_page) || [];
-      for (let i = 0; i < media.length; i++) {
-        const m = media[i];
-        const path = `${userId}/${batchId}/${row.id}/${i}.${m.ext}`;
-        const { error: upErr } = await supabase.storage.from("post-images").upload(path, m.bytes, {
-          contentType: m.contentType,
-          upsert: true,
-        });
-        if (upErr) { console.error("upload err", upErr); continue; }
-        const { data: pub } = supabase.storage.from("post-images").getPublicUrl(path);
-        await supabase.from("post_images").insert({
+      const media = (mediaPerPage.get(p.pdf_page) || []).map((m) => ({
+        base64: m.bytes.toString("base64"),
+        ext: m.ext,
+        contentType: m.contentType,
+      }));
+      await callApi("create-post", {
+        post: {
           user_id: userId,
-          post_id: row.id,
-          storage_path: path,
-          public_url: pub.publicUrl,
-          sort_order: i,
-        });
-      }
+          batch_id: batchId,
+          position: p.position,
+          focus: p.focus,
+          format: p.format,
+          original_caption: p.caption,
+          original_cta: p.cta,
+          translated_caption: p.translated_caption,
+          translated_cta: p.translated_cta,
+          hashtags: p.hashtags,
+          link_url: p.link_url,
+          publish_at: p.publish_at,
+        },
+        media,
+      });
     }
 
-    await supabase.from("batches").update({ status: "ready" }).eq("id", batchId);
+    await callApi("finish-batch", { batchId, status: "ready" });
     console.log(`[batch ${batchId}] ✅ done`);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[batch ${batchId}] ❌`, msg);
-    await supabase.from("batches").update({ status: "error", error: msg }).eq("id", batchId);
+    try { await callApi("finish-batch", { batchId, status: "error", error: msg }); } catch {}
   }
 }
 
@@ -207,24 +180,9 @@ async function extractFromPptx(buf, targetLangName, targetCode) {
     return `===== Slide ${s.idx} ${fmtHint} =====\n${s.text}`;
   }).join("\n\n");
 
-  const systemPrompt = `Du extrahierst LinkedIn-Posts aus einem PPTX Content-Plan und übersetzt sie ins ${targetLangName}.
-Jede Slide ist üblicherweise ein Post. Übersichts-/Cover-Slides bitte überspringen.
-Gib für jeden Post zurück:
-- position (P1=1, P2=2, ...)
-- pdf_page (slide-Nummer im PPTX wo dieser Post liegt — nutze die Slide-Nummer aus dem Header "===== Slide N =====")
-- focus (Thema)
-- format (CAROUSEL/SINGLE IMAGE/VIDEO — leite vom Hinweis (video/multiple images/single image) ab)
-- caption (Original, vollständig, unverändert)
-- cta (Call to Action Original, unverändert)
-- hashtags (Array, ohne #)
-- link_url
-- publish_at (ISO 8601 UTC, kombiniere DATE + TIME. DD.MM.YYYY. Bei Zeitspanne nimm Anfang.)
-- translated_caption (professionelle Übersetzung der caption ins ${targetLangName}${targetCode === "en" ? " — falls Original bereits Englisch ist, übernehme es 1:1" : ""})
-- translated_cta (Übersetzung des CTA ins ${targetLangName})`;
-
-  const aiRes = await fetch(`${SUPABASE_URL}/functions/v1/ai-extract`, {
+  const aiRes = await fetch(`${API_BASE}/ai-extract`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${WORKER_SHARED_SECRET}`, "Content-Type": "application/json" },
+    headers: authHeaders,
     body: JSON.stringify({ doc, targetLangName, targetCode }),
   });
   if (!aiRes.ok) {
@@ -273,40 +231,4 @@ function mimeFromExt(ext) {
     case "webm": return "video/webm";
     default: return null;
   }
-}
-function postsTool() {
-  return {
-    type: "function",
-    function: {
-      name: "save_posts",
-      parameters: {
-        type: "object",
-        properties: {
-          posts: {
-            type: "array",
-            items: {
-              type: "object",
-              properties: {
-                position: { type: "number" },
-                pdf_page: { type: "number" },
-                focus: { type: "string" },
-                format: { type: "string" },
-                caption: { type: "string" },
-                cta: { type: "string" },
-                hashtags: { type: "array", items: { type: "string" } },
-                link_url: { type: "string" },
-                publish_at: { type: "string" },
-                translated_caption: { type: "string" },
-                translated_cta: { type: "string" },
-              },
-              required: ["position", "pdf_page", "focus", "format", "caption", "hashtags", "publish_at", "translated_caption"],
-              additionalProperties: false,
-            },
-          },
-        },
-        required: ["posts"],
-        additionalProperties: false,
-      },
-    },
-  };
 }
