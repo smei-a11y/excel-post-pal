@@ -5,10 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 2px;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -32,36 +32,74 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-serif: "Playfair Display", Georgia, "Times New Roman", serif;
+
+  --tracking-tighter: -0.05em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.1em;
+  --tracking-widest: 0.2em;
+  --tracking-luxury: 0.28em;
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.99 0.005 260);
-  --foreground: oklch(0.18 0.03 260);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0.03 260);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0.03 260);
-  --primary: oklch(0.45 0.18 255);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.01 260);
-  --secondary-foreground: oklch(0.25 0.03 260);
-  --muted: oklch(0.96 0.01 260);
-  --muted-foreground: oklch(0.5 0.02 260);
-  --accent: oklch(0.94 0.03 250);
-  --accent-foreground: oklch(0.25 0.05 255);
-  --destructive: oklch(0.6 0.22 25);
+  --radius: 0px;
+
+  /* BoConcept-inspired palette: off-white greige + deep charcoal */
+  --background: oklch(0.978 0.003 95);          /* #F9F9F7 */
+  --foreground: oklch(0.24 0 0);                /* #222222 */
+
+  --card: oklch(0.985 0.002 95);                /* slightly lighter than bg */
+  --card-foreground: oklch(0.24 0 0);
+
+  --popover: oklch(0.99 0.002 95);
+  --popover-foreground: oklch(0.24 0 0);
+
+  --primary: oklch(0.24 0 0);                   /* charcoal #222 */
+  --primary-foreground: oklch(0.985 0.002 95);
+
+  --secondary: oklch(0.95 0.003 95);
+  --secondary-foreground: oklch(0.24 0 0);
+
+  --muted: oklch(0.95 0.003 95);
+  --muted-foreground: oklch(0.5 0.005 95);
+
+  --accent: oklch(0.93 0.004 95);
+  --accent-foreground: oklch(0.24 0 0);
+
+  --destructive: oklch(0.55 0.18 25);
   --destructive-foreground: oklch(0.99 0 0);
-  --success: oklch(0.62 0.16 150);
+
+  --success: oklch(0.55 0.08 150);
   --success-foreground: oklch(0.99 0 0);
-  --warning: oklch(0.75 0.15 75);
+
+  --warning: oklch(0.7 0.1 75);
   --warning-foreground: oklch(0.2 0.05 75);
-  --border: oklch(0.92 0.01 260);
-  --input: oklch(0.92 0.01 260);
-  --ring: oklch(0.45 0.18 255);
+
+  --border: oklch(0.9 0.004 95);
+  --input: oklch(0.9 0.004 95);
+  --ring: oklch(0.24 0 0);
 }
 
 @layer base {
   * { border-color: var(--color-border); }
-  body { background-color: var(--color-background); color: var(--color-foreground); font-feature-settings: "cv11", "ss01"; }
+  html, body { background-color: var(--color-background); color: var(--color-foreground); }
+  body {
+    font-family: var(--font-sans);
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  h1, h2, h3, h4 { letter-spacing: -0.01em; }
+  /* Remove default shadows globally for the minimalist aesthetic */
+  .shadow, .shadow-sm, .shadow-md, .shadow-lg, .shadow-xl { box-shadow: none !important; }
 }
+
+/* Utility classes specific to the BoConcept-inspired theme */
+.font-serif { font-family: var(--font-serif); }
+.font-sans  { font-family: var(--font-sans); }
+.tracking-luxury { letter-spacing: 0.28em; }
+.tracking-widest { letter-spacing: 0.2em; }
