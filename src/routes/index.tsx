@@ -12,6 +12,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Progress } from "@/components/ui/progress";
+import type { TusHandle } from "@/lib/tus-upload";
 
 export const Route = createFileRoute("/")({ component: App });
 
@@ -216,7 +218,23 @@ function App() {
   const [liExpiresAt, setLiExpiresAt] = useState<string | null>(null);
   const [liConnecting, setLiConnecting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadPct, setUploadPct] = useState(0);
+  const [uploadBytes, setUploadBytes] = useState(0);
+  const [uploadTotal, setUploadTotal] = useState(0);
+  const [uploadPaused, setUploadPaused] = useState(false);
+  const [uploadHandle, setUploadHandle] = useState<TusHandle | null>(null);
   const [showSettings, setShowSettings] = useState(false);
+
+  // Warn before leaving page during an active upload
+  useEffect(() => {
+    if (!uploading) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [uploading]);
 
   // Auth gate
   useEffect(() => {
@@ -281,12 +299,28 @@ function App() {
       return;
     }
     setUploading(true);
+    setUploadPct(0);
+    setUploadBytes(0);
+    setUploadTotal(file.size);
+    setUploadPaused(false);
     try {
-      const path = `${userId}/${crypto.randomUUID()}-${file.name}`;
+      // Stable, deterministic path per file → enables resume after tab reload.
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const path = `${userId}/${file.size}-${file.lastModified}-${safeName}`;
 
-      // Resumable (TUS) upload — works for very large files (up to 1 GB here)
+      // Resumable (TUS) upload — survives token expiry, network drops, reload.
       const { tusUpload } = await import("@/lib/tus-upload");
-      await tusUpload({ file, bucket: "post-pdfs", path });
+      await tusUpload({
+        file,
+        bucket: "post-pdfs",
+        path,
+        onProgress: (pct, bytes, total) => {
+          setUploadPct(pct);
+          setUploadBytes(bytes);
+          setUploadTotal(total);
+        },
+        onHandle: (h) => setUploadHandle(h),
+      });
 
       const { data: inserted, error: bErr } = await supabase.from("batches").insert({
         user_id: userId,
@@ -305,10 +339,31 @@ function App() {
       load();
 
     } catch (e: any) {
-      toast.error("Upload error: " + (e?.message || e));
+      toast.error("Upload error: " + (e?.message || e), {
+        description: "Pick the same file again to resume from where it stopped.",
+        duration: 10000,
+      });
     } finally {
       setUploading(false);
+      setUploadHandle(null);
+      setUploadPaused(false);
     }
+  };
+
+  const pauseUpload = () => {
+    uploadHandle?.pause();
+    setUploadPaused(true);
+  };
+  const resumeUpload = () => {
+    uploadHandle?.resume();
+    setUploadPaused(false);
+  };
+  const cancelUpload = async () => {
+    await uploadHandle?.abort(true);
+    setUploading(false);
+    setUploadHandle(null);
+    setUploadPaused(false);
+    toast("Upload cancelled");
   };
 
   const saveSettings = async () => {
@@ -498,7 +553,17 @@ function App() {
           </ol>
         </Card>
 
-        <UploadZone uploading={uploading} onFile={onUpload} />
+        <UploadZone
+          uploading={uploading}
+          onFile={onUpload}
+          pct={uploadPct}
+          bytes={uploadBytes}
+          total={uploadTotal}
+          paused={uploadPaused}
+          onPause={pauseUpload}
+          onResume={resumeUpload}
+          onCancel={cancelUpload}
+        />
 
         {batches.length > 0 && (
           <section>
