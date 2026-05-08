@@ -339,8 +339,11 @@ function App() {
       load();
 
     } catch (e: any) {
-      toast.error("Upload error: " + (e?.message || e), {
-        description: "Pick the same file again to resume from where it stopped.",
+      const message = e?.message || String(e);
+      toast.error("Upload error: " + message, {
+        description: message.includes("Sitzung")
+          ? "Logge dich neu ein und wähle danach dieselbe Datei erneut aus."
+          : "Pick the same file again to resume from where it stopped.",
         duration: 10000,
       });
     } finally {
