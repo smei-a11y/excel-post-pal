@@ -681,14 +681,28 @@ function FeedbackFooter() {
   );
 }
 
-function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: File) => void }) {
+function UploadZone({
+  uploading, onFile, pct, bytes, total, paused, onPause, onResume, onCancel,
+}: {
+  uploading: boolean;
+  onFile: (f: File) => void;
+  pct: number;
+  bytes: number;
+  total: number;
+  paused: boolean;
+  onPause: () => void;
+  onResume: () => void;
+  onCancel: () => void;
+}) {
   const [drag, setDrag] = useState(false);
+  const mb = (n: number) => (n / (1024 * 1024)).toFixed(1);
   return (
     <Card
       className={`p-10 border-2 border-dashed transition-colors text-center ${drag ? "border-primary bg-accent/40" : "border-border"}`}
-      onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+      onDragOver={(e) => { if (!uploading) { e.preventDefault(); setDrag(true); } }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => {
+        if (uploading) return;
         e.preventDefault(); setDrag(false);
         const f = e.dataTransfer.files?.[0];
         if (f) onFile(f);
@@ -702,11 +716,34 @@ function UploadZone({ uploading, onFile }: { uploading: boolean; onFile: (f: Fil
           <h3 className="font-medium">Upload a new content plan (PPTX)</h3>
           <p className="text-sm text-muted-foreground">AI extracts captions, images, videos, date, time and hashtags and translates automatically.</p>
         </div>
-        <label>
-          <input type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden" disabled={uploading}
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-          <Button asChild disabled={uploading}><span>{uploading ? "Processing..." : "Choose file"}</span></Button>
-        </label>
+
+        {uploading ? (
+          <div className="w-full max-w-md space-y-3">
+            <Progress value={pct} />
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>{mb(bytes)} MB / {mb(total)} MB</span>
+              <span>{pct.toFixed(1)}%{paused ? " · paused" : ""}</span>
+            </div>
+            <div className="flex gap-2 justify-center">
+              {paused ? (
+                <Button size="sm" variant="outline" onClick={onResume}>Resume</Button>
+              ) : (
+                <Button size="sm" variant="outline" onClick={onPause}>Pause</Button>
+              )}
+              <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Keep this tab open. Disable sleep/energy-saving mode. LAN is faster than WLAN.
+              The upload resumes automatically after short network drops, and you can re-pick the same file to continue if it stops.
+            </p>
+          </div>
+        ) : (
+          <label>
+            <input type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
+            <Button asChild><span>Choose file</span></Button>
+          </label>
+        )}
       </div>
     </Card>
   );
