@@ -1,34 +1,67 @@
-# Upload-Stabilität für große Dateien (bis 1 GB)
+## Problem
 
-## Ursachen für Abbruch bei 650 MB
-1. **Token läuft ab** — `tus-upload.ts` setzt den Bearer-Token einmal vor dem Start. Bei langsamer Leitung (>1 h) → 401 mitten im Upload.
-2. **Kein Resume nach Reload** — Pfad enthält `crypto.randomUUID()`, TUS-Fingerprint ändert sich jedes Mal.
-3. **Kurze Retry-Fenster** — WLAN-Drop >20 s = Abbruch.
-4. **Kein Pause/Resume in der UI**, kein echter Fortschritt, keine Warnung beim Verlassen der Seite.
+1. **Race-Condition** — Worker reagiert nur auf POST `/process`. Trifft der Trigger den Worker während Cold-Start/Redeploy, bleibt der Batch auf `queued` hängen.
+2. **Worker crasht bei großen Medien** — `buf.toString("base64")` + JSON-Body sprengt das V8-Stringlimit (~512 MB). Genau das hat Batch `684fc124…` auf `error` gesetzt.
 
-## Änderungen
+## Lösung
 
-### 1. `src/lib/tus-upload.ts` — robust machen
-- `onBeforeRequest`: vor jedem Chunk frischen `access_token` aus `supabase.auth.getSession()` holen → übersteht Token-Ablauf nach 1 h.
-- Längere `retryDelays` (bis 60 s, mehrere Versuche) + `onShouldRetry: () => true`.
-- Stabiler `fingerprint` aus `bucket+path+size+lastModified` und `storeFingerprintForResuming: true` → Resume nach Tab-Reload möglich.
-- `findPreviousUploads()` + `resumeFromPreviousUpload()` beim Start.
-- Neuer Callback `onHandle({ pause, resume, abort })` und erweiterter `onProgress(pct, bytesUploaded, bytesTotal)`.
+### Teil A — Direct-Upload für große Medien (Option 1)
 
-### 2. `src/routes/index.tsx` — UI/UX
-- **Stabiler Pfad pro Datei**: deterministisch aus `userId + name + size + lastModified` (kein UUID mehr) → Resume nach Reload klappt für dieselbe Datei.
-- **State**: `uploadPct`, `uploadBytes`, `uploadTotal`, `uploadHandle`, `uploadPaused`.
-- **Fortschrittsbalken** (Progress-Komponente) mit MB / MB + Prozent.
-- **Buttons** Pause / Fortsetzen / Abbrechen sichtbar während Upload.
-- **`beforeunload`-Warnung** während aktivem Upload.
-- **Fehler-Toast** mit „Erneut versuchen" (ruft `onUpload(file)` nochmal auf, TUS resumed automatisch).
-- Kurzer Hinweistext: „Tab offen lassen, Energiesparmodus aus, LAN bevorzugt."
+Statt jedes Medium als base64 in einem JSON-Body zur `worker-api` zu schicken, lädt der Worker das Medium direkt in den Storage hoch. Worker bekommt dafür eine **signed upload URL** und streamt den Zip-Eintrag direkt rein — nie als String im RAM.
 
-### 3. Keine Backend-Änderungen
-- Bucket erlaubt schon 1 GB, Upload geht direkt Browser → Storage (kein Edge-Function-Timeout-Problem).
-- Keine DB-Migration nötig.
+**`worker-api` neue Actions:**
+- `presign-upload` → input `{ userId, batchId, postId, index, ext }` → erzeugt mit `createSignedUploadUrl` einen Upload-Link für `post-images` Bucket, gibt `{ uploadUrl, token, path, publicUrl }` zurück
+- `register-media` → input `{ userId, postId, path, publicUrl, sortOrder }` → fügt Eintrag in `post_images` ein (gleiche Felder wie heute)
 
-## Ergebnis
-- Übersteht 1 h-Token-Ablauf, längere Netzwerk-Drops, Tab-Reload.
-- Sichtbarer Fortschritt, manuelles Pausieren/Fortsetzen.
-- Bei Fehler einfach Datei nochmal wählen → wird ab letztem Chunk fortgesetzt.
+**`worker/index.js` Änderungen:**
+- `create-post` wird ohne `media`-Array aufgerufen → bekommt nur die `postId`
+- Pro Medium: `presign-upload` → `entry.openReadStream()` per `fetch PUT uploadUrl` direkt hochladen → `register-media`
+- Existierender `readEntryToBuffer` + `toString("base64")` Code wird entfernt
+
+**Effekt:** Auch 1-GB-Videos laufen ohne RAM-Spitze durch. Storage-Pfade und `post_images`-Einträge bleiben identisch zu heute, Frontend sieht keinen Unterschied.
+
+### Teil B — Polling-Loop im Worker
+
+**`worker-api` neue Action `claim-next`:**
+- Ruft die existierende `claim_next_batch()` SQL-Funktion auf (race-safe via `FOR UPDATE SKIP LOCKED`)
+- Antwort identisch zu `claim-batch`: `{ claimed, batch, captionLanguage, downloadUrl }`
+
+**`worker/index.js` Änderungen:**
+- Beim Boot Polling-Loop starten: alle 30 s `claim-next` aufrufen
+- Wenn ein Batch zurückkommt → `processBatch` damit starten
+- Mutex-Flag damit nicht zwei parallele Loops/HTTP-Trigger denselben Worker doppelt belasten (max. 1 Batch gleichzeitig pro Instanz, passt zu Cloud Run `concurrency=1`)
+- HTTP-`/process`-Endpoint bleibt unverändert (schneller Pfad)
+
+### Teil C — Hängenden Batch reparieren
+
+Batch `684fc124-4ace-4574-b379-709cd3b1b6fd` per Migration von `error` zurück auf `queued` setzen und `error`-Feld leeren — der Polling-Loop greift ihn nach dem Worker-Update automatisch ab (jetzt mit Direct-Upload für das große Video).
+
+## Was du als User danach machen musst
+
+Worker neu bauen + deployen (gleicher Befehl wie letztes Mal, einziger Unterschied: `--min-instances 1` statt `0`, sonst skaliert Cloud Run nach Inaktivität auf null und niemand pollt):
+
+```bash
+cd worker
+gcloud builds submit --tag europe-west1-docker.pkg.dev/PROJECT_ID/pptx-worker/pptx-worker:latest .
+gcloud run deploy pptx-worker \
+  --image europe-west1-docker.pkg.dev/PROJECT_ID/pptx-worker/pptx-worker:latest \
+  --region europe-west1 --memory 4Gi --cpu 2 --timeout 3600 \
+  --concurrency 1 --no-cpu-throttling \
+  --min-instances 1 --max-instances 3 \
+  --allow-unauthenticated
+```
+
+Innerhalb von 30 s greift sich der Worker den hängenden Batch automatisch.
+
+## Geänderte Dateien
+
+- `worker/index.js` — Polling-Loop + Stream-Upload statt base64
+- `supabase/functions/worker-api/index.ts` — neue Actions `claim-next`, `presign-upload`, `register-media`
+- Migration: Reset von Batch `684fc124…` auf `queued`
+
+**NICHT geändert:** Frontend, DB-Schema, `trigger-worker` Edge Function, Storage-Bucket-Struktur.
+
+## Risiken
+
+- `createSignedUploadUrl` ist seit `@supabase/supabase-js` v2.16 verfügbar → ok
+- `min-instances=1` kostet ein paar Cent/Monat fixe Idle-CPU — notwendig fürs Polling

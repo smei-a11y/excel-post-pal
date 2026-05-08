@@ -58,6 +58,9 @@ async function callApi(action, payload) {
   return res.json();
 }
 
+// Mutex: at most 1 batch in flight per instance (matches Cloud Run concurrency=1)
+let busy = false;
+
 http.createServer(async (req, res) => {
   if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
     res.writeHead(200, { "Content-Type": "text/plain" }); res.end("ok"); return;
@@ -87,12 +90,39 @@ http.createServer(async (req, res) => {
 
 async function handleBatchById(batchId) {
   console.log(`[worker] received trigger for batch ${batchId}`);
-  let claim;
-  try { claim = await callApi("claim-batch", { batchId }); }
-  catch (e) { console.error("[claim] error", e.message); return; }
-  if (!claim.claimed) { console.log(`[worker] batch ${batchId} not in 'queued', skipping`); return; }
-  await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
+  if (busy) { console.log(`[worker] busy, skipping trigger for ${batchId}`); return; }
+  busy = true;
+  try {
+    const claim = await callApi("claim-batch", { batchId });
+    if (!claim.claimed) { console.log(`[worker] batch ${batchId} not in 'queued', skipping`); return; }
+    await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
+  } catch (e) {
+    console.error("[handle] error", e.message);
+  } finally {
+    busy = false;
+  }
 }
+
+// Polling loop: every 30s, claim the next queued batch (race-safe via SQL lock).
+// Catches batches missed by the HTTP trigger (cold start, redeploy, instance scaled to 0).
+const POLL_INTERVAL_MS = 30_000;
+async function pollOnce() {
+  if (busy) return;
+  busy = true;
+  try {
+    const claim = await callApi("claim-next", {});
+    if (!claim.claimed) return;
+    console.log(`[poll] picked up batch ${claim.batch.id}`);
+    await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
+  } catch (e) {
+    console.error("[poll] error", e.message);
+  } finally {
+    busy = false;
+  }
+}
+setInterval(() => { pollOnce().catch((e) => console.error("[poll] unexpected", e)); }, POLL_INTERVAL_MS);
+// Kick off first poll shortly after boot
+setTimeout(() => { pollOnce().catch(() => {}); }, 3000);
 
 async function streamToFile(url, filePath) {
   const res = await fetch(url);
@@ -197,22 +227,12 @@ async function processBatch(batch, captionLanguage, downloadUrl) {
     const args = await aiRes.json();
     console.log(`[batch ${batchId}] AI returned ${args.posts.length} posts`);
 
-    // Pass 2: per post, stream media one at a time
+    // Pass 2: per post, stream-upload media one at a time (no base64, no buffer)
     for (const p of args.posts) {
       const slide = slides.find((s) => s.idx === p.pdf_page);
-      const media = [];
-      if (slide) {
-        for (const mPath of slide.mediaPaths) {
-          const ext = (mPath.split(".").pop() || "").toLowerCase();
-          const ct = mimeFromExt(ext);
-          if (!ct) continue;
-          const entry = entries.get(mPath);
-          if (!entry) continue;
-          const buf = await readEntryToBuffer(entry);
-          media.push({ base64: buf.toString("base64"), ext, contentType: ct });
-        }
-      }
-      await callApi("create-post", {
+
+      // 1. Create post (without media)
+      const createRes = await callApi("create-post", {
         post: {
           user_id: userId,
           batch_id: batchId,
@@ -227,10 +247,52 @@ async function processBatch(batch, captionLanguage, downloadUrl) {
           link_url: p.link_url,
           publish_at: p.publish_at,
         },
-        media,
+        media: [],
       });
-      // help GC: drop refs
-      media.length = 0;
+      const postId = createRes.postId;
+
+      // 2. For each media: presign → stream PUT to storage → register
+      if (slide) {
+        let i = 0;
+        for (const mPath of slide.mediaPaths) {
+          const ext = (mPath.split(".").pop() || "").toLowerCase();
+          const ct = mimeFromExt(ext);
+          if (!ct) continue;
+          const entry = entries.get(mPath);
+          if (!entry) continue;
+
+          const presign = await callApi("presign-upload", {
+            userId, batchId, postId, index: i, ext,
+          });
+
+          const stream = await entry.openReadStream();
+          const size = entry.uncompressedSize;
+          console.log(`[batch ${batchId}] uploading ${mPath} (${(size / 1024 / 1024).toFixed(1)} MB) → ${presign.path}`);
+
+          const upRes = await fetch(presign.uploadUrl, {
+            method: "PUT",
+            headers: {
+              "content-type": ct,
+              "content-length": String(size),
+              "x-upsert": "true",
+            },
+            body: Readable.toWeb(stream),
+            duplex: "half",
+          });
+          if (!upRes.ok) {
+            const t = await upRes.text().catch(() => "");
+            throw new Error(`storage upload failed ${upRes.status}: ${t}`);
+          }
+
+          await callApi("register-media", {
+            userId, postId,
+            path: presign.path,
+            publicUrl: presign.publicUrl,
+            sortOrder: i,
+          });
+          i++;
+        }
+      }
     }
 
     await callApi("finish-batch", { batchId, status: "ready" });

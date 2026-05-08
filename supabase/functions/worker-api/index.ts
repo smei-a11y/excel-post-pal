@@ -1,6 +1,6 @@
 // Worker API: all DB + storage operations for the Cloud Run worker.
 // Authenticated via WORKER_SHARED_SECRET. Uses service role internally.
-// Actions: fetch-batch, create-post, finish-batch
+// Actions: claim-batch, claim-next, create-post, presign-upload, register-media, finish-batch
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -126,6 +126,62 @@ Deno.serve(async (req) => {
         uploaded.push(path);
       }
       return json({ postId: row.id, uploaded });
+    }
+
+    if (action === "claim-next") {
+      // Atomically claim the next queued batch (race-safe via FOR UPDATE SKIP LOCKED)
+      const { data: rows, error } = await admin.rpc("claim_next_batch");
+      if (error) return json({ error: error.message }, 500);
+      const claimed = Array.isArray(rows) ? rows[0] : rows;
+      if (!claimed) return json({ claimed: false }, 200);
+
+      const { data: settings } = await admin
+        .from("app_settings")
+        .select("caption_language")
+        .eq("user_id", claimed.user_id)
+        .maybeSingle();
+
+      const { data: signed, error: sErr } = await admin.storage
+        .from("post-pdfs")
+        .createSignedUrl(claimed.pdf_path, 3600);
+      if (sErr) return json({ error: "signed url failed: " + sErr.message }, 500);
+
+      return json({
+        claimed: true,
+        batch: claimed,
+        captionLanguage: settings?.caption_language || "de",
+        downloadUrl: signed.signedUrl,
+      });
+    }
+
+    if (action === "presign-upload") {
+      // body: { userId, batchId, postId, index, ext }
+      const { userId, batchId, postId, index, ext } = body;
+      if (!userId || !batchId || !postId || index === undefined || !ext) {
+        return json({ error: "userId, batchId, postId, index, ext required" }, 400);
+      }
+      const path = `${userId}/${batchId}/${postId}/${index}.${ext}`;
+      const { data, error } = await admin.storage
+        .from("post-images")
+        .createSignedUploadUrl(path, { upsert: true });
+      if (error || !data) return json({ error: error?.message || "presign failed" }, 500);
+      const { data: pub } = admin.storage.from("post-images").getPublicUrl(path);
+      return json({ uploadUrl: data.signedUrl, token: data.token, path, publicUrl: pub.publicUrl });
+    }
+
+    if (action === "register-media") {
+      // body: { userId, postId, path, publicUrl, sortOrder }
+      const { userId, postId, path, publicUrl, sortOrder } = body;
+      if (!userId || !postId || !path) return json({ error: "userId, postId, path required" }, 400);
+      const { error } = await admin.from("post_images").insert({
+        user_id: userId,
+        post_id: postId,
+        storage_path: path,
+        public_url: publicUrl,
+        sort_order: sortOrder ?? 0,
+      });
+      if (error) return json({ error: error.message }, 500);
+      return json({ ok: true });
     }
 
     if (action === "finish-batch") {
