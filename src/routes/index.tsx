@@ -612,6 +612,9 @@ function App() {
             <div className="grid gap-px bg-border border border-border">
               {batches.map((b) => (
                 <div key={b.id} className="px-6 py-5 bg-background flex flex-col gap-3">
+                  {(b.status === "queued" || b.status === "processing") && (
+                    <BatchProgress startedAt={b.created_at} status={b.status} />
+                  )}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                       <StatusIcon status={b.status} />
@@ -625,9 +628,6 @@ function App() {
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => deleteBatch(b.id)}><Trash2 /></Button>
                   </div>
-                  {(b.status === "queued" || b.status === "processing") && (
-                    <BatchProgress startedAt={b.created_at} status={b.status} />
-                  )}
                 </div>
               ))}
             </div>
