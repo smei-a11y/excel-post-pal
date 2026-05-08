@@ -547,9 +547,6 @@ function App() {
         {/* Hero upload section — centered, generous whitespace */}
         <section className="text-center space-y-10">
           <div className="space-y-6 max-w-2xl mx-auto">
-            <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">
-              Statement-Designs for Modern Communication
-            </div>
             <h2 className="font-serif text-4xl sm:text-5xl leading-[1.1] tracking-tight text-foreground">
               Upload. Translate. Publish.
             </h2>
