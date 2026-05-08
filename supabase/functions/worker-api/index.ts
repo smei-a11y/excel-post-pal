@@ -23,6 +23,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
+async function base64ToBlob(base64: string, contentType = "application/octet-stream") {
+  const normalized = base64.includes(",") ? base64.slice(base64.indexOf(",") + 1) : base64;
+  const fromBase64 = (Uint8Array as unknown as { fromBase64?: (value: string) => Uint8Array }).fromBase64;
+  if (fromBase64) return new Blob([fromBase64(normalized)], { type: contentType });
+
+  const binary = atob(normalized);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: contentType });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -98,8 +109,8 @@ Deno.serve(async (req) => {
       for (let i = 0; i < mediaArr.length; i++) {
         const m = mediaArr[i];
         const path = `${post.user_id}/${post.batch_id}/${row.id}/${i}.${m.ext}`;
-        const bytes = Uint8Array.from(atob(m.base64), (c) => c.charCodeAt(0));
-        const { error: upErr } = await admin.storage.from("post-images").upload(path, bytes, {
+        const uploadBody = await base64ToBlob(m.base64, m.contentType);
+        const { error: upErr } = await admin.storage.from("post-images").upload(path, uploadBody, {
           contentType: m.contentType,
           upsert: true,
         });
