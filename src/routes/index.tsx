@@ -611,18 +611,23 @@ function App() {
             </div>
             <div className="grid gap-px bg-border border border-border">
               {batches.map((b) => (
-                <div key={b.id} className="px-6 py-5 bg-background flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <StatusIcon status={b.status} />
-                    <div>
-                      <div className="text-sm font-medium">{b.name}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">
-                        {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
-                        {b.error && ` · ${b.error}`}
+                <div key={b.id} className="px-6 py-5 bg-background flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <StatusIcon status={b.status} />
+                      <div>
+                        <div className="text-sm font-medium">{b.name}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">
+                          {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
+                          {b.error && ` · ${b.error}`}
+                        </div>
                       </div>
                     </div>
+                    <Button variant="ghost" size="icon" onClick={() => deleteBatch(b.id)}><Trash2 /></Button>
                   </div>
-                  <Button variant="ghost" size="icon" onClick={() => deleteBatch(b.id)}><Trash2 /></Button>
+                  {(b.status === "queued" || b.status === "processing") && (
+                    <BatchProgress startedAt={b.created_at} status={b.status} />
+                  )}
                 </div>
               ))}
             </div>
