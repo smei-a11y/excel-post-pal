@@ -12,13 +12,16 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const WORKER_URL = Deno.env.get("WORKER_URL");
+    const WORKER_URL_RAW = Deno.env.get("WORKER_URL");
     const WORKER_SHARED_SECRET = Deno.env.get("WORKER_SHARED_SECRET");
-    if (!WORKER_URL || !WORKER_SHARED_SECRET) {
+    if (!WORKER_URL_RAW || !WORKER_SHARED_SECRET) {
       return new Response(JSON.stringify({ error: "Worker not configured" }), {
         status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+    // Extract a clean https URL even if pasted with surrounding text/backticks
+    const urlMatch = WORKER_URL_RAW.match(/https?:\/\/[^\s`'"<>]+/);
+    const WORKER_URL = (urlMatch ? urlMatch[0] : WORKER_URL_RAW).trim().replace(/[`'"]+$/g, "");
 
     const auth = req.headers.get("Authorization") || "";
     const supabase = createClient(
