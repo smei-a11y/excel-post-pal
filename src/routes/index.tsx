@@ -88,6 +88,25 @@ function LinkedInGuideDialog() {
               Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in to LinkedIn in the new tab and confirm the permissions — your account is then linked.
             </p>
           </section>
+
+          <section className="space-y-2">
+            <h3 className="font-semibold text-foreground">6. Data Security &amp; Privacy</h3>
+            <p className="text-muted-foreground">Our app follows industry-standard security practices:</p>
+            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+              <li><strong>Encryption in transit</strong>: All traffic uses HTTPS/TLS.</li>
+              <li><strong>Encryption at rest</strong>: Database and file storage are encrypted by our infrastructure providers.</li>
+              <li><strong>Strict data isolation</strong>: Row-Level Security policies ensure each user can only access their own data — enforced at the database level, not just in application code.</li>
+              <li><strong>Authentication</strong>: Managed via secure session tokens. Passwords are never stored in plain text.</li>
+              <li><strong>Secrets management</strong>: API keys and OAuth tokens (e.g. LinkedIn) are stored as encrypted backend secrets, never exposed to the browser.</li>
+              <li><strong>EU hosting</strong>: All data is processed and stored in the EU (Frankfurt / Belgium regions), GDPR-compliant.</li>
+              <li><strong>Minimal data collection</strong>: We store only what is required to operate the service — your LinkedIn connection, your uploaded presentations, and the generated posts.</li>
+              <li><strong>Third-party access</strong>: Files are processed by our own backend worker; no third-party AI provider receives your raw files outside of the LLM call needed to generate captions.</li>
+              <li><strong>User control</strong>: You can disconnect your LinkedIn account and delete your data at any time.</li>
+            </ul>
+            <p className="text-xs text-muted-foreground">
+              If you have specific compliance questions (DPA, SOC 2, etc.), please contact us.
+            </p>
+          </section>
         </div>
       </DialogContent>
     </Dialog>
