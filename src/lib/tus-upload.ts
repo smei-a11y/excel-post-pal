@@ -41,7 +41,11 @@ export async function tusUpload({
         authorization: `Bearer ${sessionData.session!.access_token}`,
         "x-upsert": "true",
       },
-      uploadDataDuringCreation: true,
+      // Do not send the first 6 MB together with the upload-creation request.
+      // If that POST response is lost, tus-js-client has no upload URL yet and
+      // retries by sending the same first chunk again. Creating the TUS upload
+      // first, then PATCHing chunks, lets retries/HEAD resume from the real offset.
+      uploadDataDuringCreation: false,
       removeFingerprintOnSuccess: true,
       storeFingerprintForResuming: true,
       metadata: {
@@ -54,7 +58,13 @@ export async function tusUpload({
       fingerprint: async () =>
         `tus-${bucket}-${path}-${file.size}-${file.lastModified}`,
       chunkSize: 6 * 1024 * 1024,
-      onShouldRetry: () => true,
+      onShouldRetry: (err, retryAttempt) => {
+        const status = err?.originalResponse?.getStatus?.();
+        if (status && status >= 400 && status < 500 && ![409, 423, 429].includes(status)) {
+          return false;
+        }
+        return retryAttempt < 9;
+      },
       onBeforeRequest: async (req) => {
         const t = await getFreshToken();
         if (t) req.setHeader("authorization", `Bearer ${t}`);
