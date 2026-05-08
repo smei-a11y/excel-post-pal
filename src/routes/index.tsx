@@ -944,6 +944,34 @@ function StatusIcon({ status }: { status: string }) {
   return <Clock className="h-5 w-5 text-muted-foreground" />;
 }
 
+function BatchProgress({ startedAt, status }: { startedAt: string; status: string }) {
+  const ESTIMATED_MS = 4 * 60 * 1000; // ~4 min expected
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const elapsed = Math.max(0, now - new Date(startedAt).getTime());
+  const pct = Math.min(95, (elapsed / ESTIMATED_MS) * 100);
+  const mm = Math.floor(elapsed / 60000);
+  const ss = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, "0");
+  const label = status === "queued" ? "Waiting for worker" : "Extracting & translating";
+  return (
+    <div className="space-y-1.5 pl-9">
+      <div className="h-[2px] bg-border overflow-hidden">
+        <div
+          className="h-full bg-foreground transition-all duration-1000 ease-linear"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+        <span>{label}</span>
+        <span>{mm}:{ss} elapsed · ~4 min</span>
+      </div>
+    </div>
+  );
+}
+
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   const tz = d.getTimezoneOffset() * 60000;
