@@ -1,4 +1,5 @@
 import JSZip from "jszip";
+import http from "http";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const WORKER_SHARED_SECRET = process.env.WORKER_SHARED_SECRET;
@@ -22,7 +23,6 @@ const LANG_NAMES = {
 console.log(`[worker] starting — HTTP trigger mode (gateway-only)`);
 
 const port = parseInt(process.env.PORT || "8080", 10);
-const http = await import("http");
 
 async function readJson(req) {
   return new Promise((resolve, reject) => {
@@ -71,7 +71,7 @@ http.createServer(async (req, res) => {
     return;
   }
   res.writeHead(404); res.end("not found");
-}).listen(port, () => console.log(`[worker] HTTP server listening on :${port}`));
+}).listen(port, "0.0.0.0", () => console.log(`[worker] HTTP server listening on 0.0.0.0:${port}`));
 
 async function handleBatchById(batchId) {
   console.log(`[worker] received trigger for batch ${batchId}`);
