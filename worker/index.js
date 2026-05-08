@@ -1,5 +1,17 @@
-import JSZip from "jszip";
+// Streaming PPTX worker — handles huge files (>1GB) without OOM.
+// Strategy:
+//   1. Download PPTX to /tmp via stream (no full buffer in RAM)
+//   2. Open ZIP with yauzl (only reads central directory ~KB)
+//   3. First pass: extract slide text + media entry references (no bytes loaded)
+//   4. Call AI with text only
+//   5. Second pass: stream each media entry one at a time, base64, POST, release
+import { createWriteStream, createReadStream, promises as fsp } from "fs";
+import { pipeline } from "stream/promises";
+import { Readable } from "stream";
+import { tmpdir } from "os";
+import path from "path";
 import http from "http";
+import { open as openZip } from "yauzl-promise";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const WORKER_SHARED_SECRET = process.env.WORKER_SHARED_SECRET;
@@ -20,7 +32,7 @@ const LANG_NAMES = {
   et: "Estnisch", lv: "Lettisch", lt: "Litauisch", ga: "Irisch", mt: "Maltesisch",
 };
 
-console.log(`[worker] starting — HTTP trigger mode (gateway-only)`);
+console.log(`[worker] starting — streaming mode (yauzl)`);
 
 const port = parseInt(process.env.PORT || "8080", 10);
 
@@ -82,33 +94,124 @@ async function handleBatchById(batchId) {
   await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
 }
 
+async function streamToFile(url, filePath) {
+  const res = await fetch(url);
+  if (!res.ok || !res.body) throw new Error(`download failed: ${res.status}`);
+  const nodeStream = Readable.fromWeb(res.body);
+  await pipeline(nodeStream, createWriteStream(filePath));
+}
+
+async function readEntryToBuffer(entry) {
+  const stream = await entry.openReadStream();
+  const chunks = [];
+  for await (const c of stream) chunks.push(c);
+  return Buffer.concat(chunks);
+}
+
+async function readEntryToString(entry) {
+  return (await readEntryToBuffer(entry)).toString("utf8");
+}
+
 async function processBatch(batch, captionLanguage, downloadUrl) {
   const batchId = batch.id;
   const userId = batch.user_id;
+  const tmpFile = path.join(tmpdir(), `pptx-${batchId}.pptx`);
+  let zip = null;
   try {
     const rawLang = captionLanguage || "de";
     const targetCode = rawLang === "both" ? "de" : (rawLang === "en" ? "en" : rawLang);
     const targetLangName = LANG_NAMES[targetCode] || "Deutsch";
 
-    console.log(`[batch ${batchId}] downloading ${batch.pdf_path}`);
-    const dlRes = await fetch(downloadUrl);
-    if (!dlRes.ok) throw new Error(`download failed: ${dlRes.status}`);
-    const fileBuf = Buffer.from(await dlRes.arrayBuffer());
-    console.log(`[batch ${batchId}] downloaded ${(fileBuf.length / 1024 / 1024).toFixed(1)} MB`);
+    console.log(`[batch ${batchId}] streaming download → ${tmpFile}`);
+    await streamToFile(downloadUrl, tmpFile);
+    const stat = await fsp.stat(tmpFile);
+    console.log(`[batch ${batchId}] downloaded ${(stat.size / 1024 / 1024).toFixed(1)} MB`);
 
     const filename = (batch.source_filename || batch.pdf_path || "").toLowerCase();
-    const isPptx = filename.endsWith(".pptx") || filename.endsWith(".ppt");
-    if (!isPptx) throw new Error("Only PPTX supported by this worker");
+    if (!(filename.endsWith(".pptx") || filename.endsWith(".ppt"))) {
+      throw new Error("Only PPTX supported by this worker");
+    }
 
-    const { posts, mediaPerPage } = await extractFromPptx(fileBuf, targetLangName, targetCode);
-    console.log(`[batch ${batchId}] extracted ${posts.length} posts`);
+    // Pass 1: index ZIP entries
+    zip = await openZip(tmpFile);
+    /** @type {Map<string, import("yauzl-promise").Entry>} */
+    const entries = new Map();
+    for await (const entry of zip) {
+      if (entry.filename.endsWith("/")) continue;
+      entries.set(entry.filename, entry);
+    }
 
-    for (const p of posts) {
-      const media = (mediaPerPage.get(p.pdf_page) || []).map((m) => ({
-        base64: m.bytes.toString("base64"),
-        ext: m.ext,
-        contentType: m.contentType,
-      }));
+    // Collect slide XMLs (text only)
+    const slideNames = [...entries.keys()]
+      .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+      .sort((a, b) => slideNum(a) - slideNum(b));
+
+    /** @type {Array<{idx:number,text:string,mediaPaths:string[]}>} */
+    const slides = [];
+    for (let i = 0; i < slideNames.length; i++) {
+      const slidePath = slideNames[i];
+      const xml = await readEntryToString(entries.get(slidePath));
+      const text = extractTextFromSlideXml(xml);
+
+      const relsPath = slidePath.replace(/slides\/(slide\d+)\.xml$/, "slides/_rels/$1.xml.rels");
+      const mediaPaths = [];
+      const relsEntry = entries.get(relsPath);
+      if (relsEntry) {
+        const relsXml = await readEntryToString(relsEntry);
+        const targets = [...relsXml.matchAll(/Target="([^"]+)"/g)].map((m) => m[1]);
+        const seen = new Set();
+        for (const t of targets) {
+          const resolved = resolvePath("ppt/slides/" + slidePath.split("/").pop(), t);
+          if (!resolved.startsWith("ppt/media/")) continue;
+          if (seen.has(resolved)) continue;
+          seen.add(resolved);
+          if (entries.has(resolved)) mediaPaths.push(resolved);
+        }
+      }
+      slides.push({ idx: i + 1, text, mediaPaths });
+    }
+    console.log(`[batch ${batchId}] indexed ${slides.length} slides`);
+
+    // Build doc text for AI (no bytes loaded yet)
+    const doc = slides.map((s) => {
+      const exts = s.mediaPaths.map((p) => (p.split(".").pop() || "").toLowerCase());
+      const hasVideo = exts.some((e) => ["mp4", "mov", "m4v", "webm"].includes(e));
+      const fmtHint = hasVideo
+        ? "(slide contains a VIDEO)"
+        : s.mediaPaths.length > 1 ? "(slide contains multiple images — likely CAROUSEL)"
+        : s.mediaPaths.length === 1 ? "(slide contains a single image)" : "(no media)";
+      return `===== Slide ${s.idx} ${fmtHint} =====\n${s.text}`;
+    }).join("\n\n");
+
+    const aiRes = await fetch(`${API_BASE}/ai-extract`, {
+      method: "POST",
+      headers: authHeaders,
+      body: JSON.stringify({ doc, targetLangName, targetCode }),
+    });
+    if (!aiRes.ok) {
+      const t = await aiRes.text();
+      if (aiRes.status === 429) throw new Error("Rate Limit überschritten");
+      if (aiRes.status === 402) throw new Error("Kein Guthaben mehr im Lovable AI Workspace");
+      throw new Error(`AI error ${aiRes.status}: ${t}`);
+    }
+    const args = await aiRes.json();
+    console.log(`[batch ${batchId}] AI returned ${args.posts.length} posts`);
+
+    // Pass 2: per post, stream media one at a time
+    for (const p of args.posts) {
+      const slide = slides.find((s) => s.idx === p.pdf_page);
+      const media = [];
+      if (slide) {
+        for (const mPath of slide.mediaPaths) {
+          const ext = (mPath.split(".").pop() || "").toLowerCase();
+          const ct = mimeFromExt(ext);
+          if (!ct) continue;
+          const entry = entries.get(mPath);
+          if (!entry) continue;
+          const buf = await readEntryToBuffer(entry);
+          media.push({ base64: buf.toString("base64"), ext, contentType: ct });
+        }
+      }
       await callApi("create-post", {
         post: {
           user_id: userId,
@@ -126,6 +229,8 @@ async function processBatch(batch, captionLanguage, downloadUrl) {
         },
         media,
       });
+      // help GC: drop refs
+      media.length = 0;
     }
 
     await callApi("finish-batch", { batchId, status: "ready" });
@@ -134,71 +239,10 @@ async function processBatch(batch, captionLanguage, downloadUrl) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[batch ${batchId}] ❌`, msg);
     try { await callApi("finish-batch", { batchId, status: "error", error: msg }); } catch {}
+  } finally {
+    if (zip) { try { await zip.close(); } catch {} }
+    try { await fsp.unlink(tmpFile); } catch {}
   }
-}
-
-async function extractFromPptx(buf, targetLangName, targetCode) {
-  const zip = await JSZip.loadAsync(buf);
-  const slideFiles = Object.keys(zip.files)
-    .filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n))
-    .sort((a, b) => slideNum(a) - slideNum(b));
-
-  const slides = [];
-  for (let i = 0; i < slideFiles.length; i++) {
-    const slidePath = slideFiles[i];
-    const xml = await zip.file(slidePath).async("string");
-    const text = extractTextFromSlideXml(xml);
-    const relsPath = slidePath.replace(/slides\/(slide\d+)\.xml$/, "slides/_rels/$1.xml.rels");
-    const media = [];
-    const relsFile = zip.file(relsPath);
-    if (relsFile) {
-      const relsXml = await relsFile.async("string");
-      const targets = [...relsXml.matchAll(/Target="([^"]+)"/g)].map((m) => m[1]);
-      const seen = new Set();
-      for (const t of targets) {
-        const resolved = resolvePath("ppt/slides/" + slidePath.split("/").pop(), t);
-        if (!resolved.startsWith("ppt/media/")) continue;
-        if (seen.has(resolved)) continue;
-        seen.add(resolved);
-        const f = zip.file(resolved);
-        if (!f) continue;
-        const ext = (resolved.split(".").pop() || "").toLowerCase();
-        const ct = mimeFromExt(ext);
-        if (!ct) continue;
-        const bytes = Buffer.from(await f.async("uint8array"));
-        media.push({ bytes, ext, contentType: ct });
-      }
-    }
-    slides.push({ idx: i + 1, text, media });
-  }
-
-  const doc = slides.map((s) => {
-    const fmtHint = s.media.some((m) => m.contentType.startsWith("video/"))
-      ? "(slide contains a VIDEO)"
-      : s.media.length > 1 ? "(slide contains multiple images — likely CAROUSEL)"
-      : s.media.length === 1 ? "(slide contains a single image)" : "(no media)";
-    return `===== Slide ${s.idx} ${fmtHint} =====\n${s.text}`;
-  }).join("\n\n");
-
-  const aiRes = await fetch(`${API_BASE}/ai-extract`, {
-    method: "POST",
-    headers: authHeaders,
-    body: JSON.stringify({ doc, targetLangName, targetCode }),
-  });
-  if (!aiRes.ok) {
-    const t = await aiRes.text();
-    if (aiRes.status === 429) throw new Error("Rate Limit überschritten");
-    if (aiRes.status === 402) throw new Error("Kein Guthaben mehr im Lovable AI Workspace");
-    throw new Error(`AI error ${aiRes.status}: ${t}`);
-  }
-  const args = await aiRes.json();
-
-  const mediaPerPage = new Map();
-  for (const p of args.posts) {
-    const slide = slides.find((s) => s.idx === p.pdf_page);
-    if (slide) mediaPerPage.set(p.pdf_page, slide.media);
-  }
-  return { posts: args.posts, mediaPerPage };
 }
 
 function slideNum(p) { const m = /slide(\d+)\.xml$/.exec(p); return m ? parseInt(m[1], 10) : 0; }
