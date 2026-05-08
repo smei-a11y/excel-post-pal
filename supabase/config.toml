@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.linkedin-oauth-callback]
 verify_jwt = false
+
+[functions.ai-extract]
+verify_jwt = false

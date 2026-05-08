@@ -3,11 +3,10 @@ import JSZip from "jszip";
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
 const WORKER_SHARED_SECRET = process.env.WORKER_SHARED_SECRET;
 
-if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !LOVABLE_API_KEY || !WORKER_SHARED_SECRET) {
-  console.error("Missing required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, LOVABLE_API_KEY, WORKER_SHARED_SECRET");
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !WORKER_SHARED_SECRET) {
+  console.error("Missing required env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, WORKER_SHARED_SECRET");
   process.exit(1);
 }
 
@@ -223,18 +222,10 @@ Gib für jeden Post zurück:
 - translated_caption (professionelle Übersetzung der caption ins ${targetLangName}${targetCode === "en" ? " — falls Original bereits Englisch ist, übernehme es 1:1" : ""})
 - translated_cta (Übersetzung des CTA ins ${targetLangName})`;
 
-  const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+  const aiRes = await fetch(`${SUPABASE_URL}/functions/v1/ai-extract`, {
     method: "POST",
-    headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "google/gemini-2.5-pro",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: `Extrahiere alle Posts aus diesem PPTX-Inhalt und übersetze ins ${targetLangName}.\n\n${doc}` },
-      ],
-      tools: [postsTool()],
-      tool_choice: { type: "function", function: { name: "save_posts" } },
-    }),
+    headers: { Authorization: `Bearer ${WORKER_SHARED_SECRET}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ doc, targetLangName, targetCode }),
   });
   if (!aiRes.ok) {
     const t = await aiRes.text();
@@ -242,10 +233,7 @@ Gib für jeden Post zurück:
     if (aiRes.status === 402) throw new Error("Kein Guthaben mehr im Lovable AI Workspace");
     throw new Error(`AI error ${aiRes.status}: ${t}`);
   }
-  const aiData = await aiRes.json();
-  const toolCall = aiData.choices?.[0]?.message?.tool_calls?.[0];
-  if (!toolCall) throw new Error("Kein tool_call");
-  const args = JSON.parse(toolCall.function.arguments);
+  const args = await aiRes.json();
 
   const mediaPerPage = new Map();
   for (const p of args.posts) {
