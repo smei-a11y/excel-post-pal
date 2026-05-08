@@ -750,8 +750,10 @@ function UploadZone({
   const [drag, setDrag] = useState(false);
   const mb = (n: number) => (n / (1024 * 1024)).toFixed(1);
   return (
-    <Card
-      className={`p-10 border-2 border-dashed transition-colors text-center ${drag ? "border-primary bg-accent/40" : "border-border"}`}
+    <div
+      className={`relative mx-auto max-w-3xl border border-dashed transition-colors p-16 sm:p-24 text-center bg-background ${
+        drag ? "border-foreground bg-foreground/[0.02]" : "border-foreground/30"
+      }`}
       onDragOver={(e) => { if (!uploading) { e.preventDefault(); setDrag(true); } }}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => {
@@ -761,23 +763,33 @@ function UploadZone({
         if (f) onFile(f);
       }}
     >
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-12 w-12 rounded-full bg-accent flex items-center justify-center">
-          {uploading ? <Loader2 className="animate-spin" /> : <Upload />}
-        </div>
-        <div>
-          <h3 className="font-medium">Upload a new content plan (PPTX)</h3>
-          <p className="text-sm text-muted-foreground">AI extracts captions, images, videos, date, time and hashtags and translates automatically.</p>
+      <div className="flex flex-col items-center gap-8">
+        <div className="h-px w-12 bg-foreground/40" />
+        {uploading ? (
+          <Loader2 className="animate-spin h-6 w-6 stroke-1" />
+        ) : (
+          <Upload className="h-7 w-7 stroke-1" />
+        )}
+
+        <div className="space-y-3">
+          <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">PPTX file</div>
+          <h3 className="font-serif text-2xl sm:text-3xl tracking-tight text-foreground">
+            Drop your content plan here
+          </h3>
+          <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+            Or select a file manually — captions, images, videos, schedule and hashtags
+            are extracted and translated automatically.
+          </p>
         </div>
 
         {uploading ? (
-          <div className="w-full max-w-md space-y-3">
-            <Progress value={pct} />
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>{mb(bytes)} MB / {mb(total)} MB</span>
+          <div className="w-full max-w-md space-y-4">
+            <Progress value={pct} className="h-px rounded-none bg-foreground/10" />
+            <div className="flex justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+              <span>{mb(bytes)} / {mb(total)} MB</span>
               <span>{pct.toFixed(1)}%{paused ? " · paused" : ""}</span>
             </div>
-            <div className="flex gap-2 justify-center">
+            <div className="flex gap-3 justify-center pt-2">
               {paused ? (
                 <Button size="sm" variant="outline" onClick={onResume}>Resume</Button>
               ) : (
@@ -785,20 +797,20 @@ function UploadZone({
               )}
               <Button size="sm" variant="ghost" onClick={onCancel}>Cancel</Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Keep this tab open. Disable sleep/energy-saving mode. LAN is faster than WLAN.
-              The upload resumes automatically after short network drops, and you can re-pick the same file to continue if it stops.
+            <p className="text-[11px] text-muted-foreground leading-relaxed pt-2">
+              Keep this tab open. Disable sleep / energy-saving mode. LAN is faster than WLAN.
+              The upload resumes automatically after short network drops.
             </p>
           </div>
         ) : (
-          <label>
+          <label className="pt-2">
             <input type="file" accept=".pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation" className="hidden"
               onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.currentTarget.value = ""; }} />
-            <Button asChild><span>Choose file</span></Button>
+            <Button asChild size="lg"><span>Choose file</span></Button>
           </label>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
