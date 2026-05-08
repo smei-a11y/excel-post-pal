@@ -464,31 +464,38 @@ function App() {
   return (
     <div className="min-h-screen bg-background">
       <Toaster richColors position="top-right" />
-      <header className="border-b bg-card/60 backdrop-blur sticky top-0 z-10">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-semibold tracking-tight">LinkedIn Content Planner</h1>
-            <p className="text-sm text-muted-foreground">Upload PPTX · Auto-translate · Schedule and publish</p>
+      <header className="border-b border-border bg-background sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-8 sm:px-12 py-6 flex items-center justify-between">
+          <div className="space-y-1">
+            <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">
+              Linkedin · Content Studio
+            </div>
+            <h1 className="font-serif text-2xl font-normal tracking-tight text-foreground">
+              Content Planner
+            </h1>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground hidden sm:inline">{userEmail}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-[11px] uppercase tracking-widest text-muted-foreground hidden sm:inline">
+              {userEmail}
+            </span>
             <Button variant="outline" size="sm" onClick={() => setShowSettings((s) => !s)}>
-              <SettingsIcon /> Settings
+              Settings
             </Button>
-            <Button variant="ghost" size="sm" onClick={logout}>
+            <Button variant="ghost" size="sm" onClick={logout} aria-label="Sign out">
               <LogOut />
             </Button>
           </div>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8 space-y-8">
+      <main className="max-w-6xl mx-auto px-8 sm:px-12 py-16 sm:py-24 space-y-24">
         {showSettings && (
-          <Card className="p-6 space-y-5">
-            <div className="space-y-3">
-              <h2 className="font-semibold">LinkedIn connection</h2>
+          <Card className="p-10 space-y-10">
+            <div className="space-y-4">
+              <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">01 — Connection</div>
+              <h2 className="font-serif text-xl">LinkedIn account</h2>
               {liToken && liAuthor ? (
-                <div className="rounded-md border p-4 space-y-2">
+                <div className="border border-border p-6 space-y-3">
                   <div className="text-sm">
                     Connected as <span className="font-medium">{liConnectedName || liAuthor}</span>
                   </div>
@@ -497,7 +504,7 @@ function App() {
                       Token valid until: {new Date(liExpiresAt).toLocaleString("en-US")} (refreshed automatically)
                     </div>
                   )}
-                  <div className="flex gap-2 pt-1">
+                  <div className="flex gap-3 pt-2">
                     <Button size="sm" variant="outline" onClick={connectLinkedIn} disabled={liConnecting}>
                       Reconnect
                     </Button>
@@ -505,8 +512,8 @@ function App() {
                   </div>
                 </div>
               ) : (
-                <div className="rounded-md border p-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">
+                <div className="border border-border p-6 space-y-4">
+                  <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
                     Connect your LinkedIn account via OAuth. Tokens are refreshed automatically.
                   </p>
                   <Button onClick={connectLinkedIn} disabled={liConnecting}>
@@ -516,11 +523,14 @@ function App() {
                 </div>
               )}
             </div>
-            <div className="space-y-3">
-              <h2 className="font-semibold">Caption language</h2>
-              <p className="text-sm text-muted-foreground">Target language for the translated posts (the original English captions are always kept).</p>
+            <div className="space-y-4">
+              <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">02 — Language</div>
+              <h2 className="font-serif text-xl">Caption language</h2>
+              <p className="text-sm text-muted-foreground leading-relaxed max-w-xl">
+                Target language for the translated posts. Original English captions are always kept.
+              </p>
               <Select value={lang} onValueChange={(v) => setLang(v)}>
-                <SelectTrigger className="w-full sm:w-72"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-full sm:w-72 rounded-none h-11"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {LANGUAGES.map((l) => (
                     <SelectItem key={l.code} value={l.code}>{l.label}</SelectItem>
@@ -528,79 +538,119 @@ function App() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={saveSettings}>Save</Button>
+            <div>
+              <Button onClick={saveSettings}>Save settings</Button>
+            </div>
           </Card>
         )}
 
-        <Card className="p-6 bg-accent/30 border-dashed">
-          <h2 className="font-semibold mb-3 flex items-center gap-2">
-            <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs">?</span>
-            How it works
-          </h2>
-          <ol className="text-sm text-muted-foreground space-y-2 list-decimal list-inside">
-            <li>
-              <span className="text-foreground font-medium">
-                <LinkedInGuideDialog />:
-              </span>{" "}
-              Open <em>Settings</em> at the top right and click <em>Connect with LinkedIn</em>. Sign in in the new tab and grant the permissions.
-            </li>
-            <li><span className="text-foreground font-medium">Choose caption language:</span> In Settings, pick the target language for your published posts.</li>
-            <li><span className="text-foreground font-medium">Upload PPTX:</span> Drag &amp; drop or pick your content file (SharePoint → B2B Marketing Tools) below. The AI extracts captions, images, videos, date, time and hashtags and translates automatically. <span className="font-bold text-foreground">This can take a few minutes depending on the size of your PPTX file and the conversion into ready-to-publish posts. Sit back and relax — there's nothing else for you to do!</span></li>
-            <li><span className="text-foreground font-medium">Review &amp; edit posts:</span> Check each post below and adjust text, CTA, hashtags or scheduled time if needed.</li>
-            <li><span className="text-foreground font-medium">Publish:</span> Posts go live automatically at the scheduled time — or instantly with <em>Send now</em>.</li>
-            <li>
-              <span className="text-foreground font-medium">
-                <DataSecurityDialog />
-              </span>
-            </li>
-          </ol>
-        </Card>
+        {/* Hero upload section — centered, generous whitespace */}
+        <section className="text-center space-y-10">
+          <div className="space-y-6 max-w-2xl mx-auto">
+            <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">
+              Statement-Designs for Modern Communication
+            </div>
+            <h2 className="font-serif text-4xl sm:text-5xl leading-[1.1] tracking-tight text-foreground">
+              Upload. Translate. Publish.
+            </h2>
+            <p className="text-sm text-muted-foreground leading-relaxed max-w-lg mx-auto">
+              A quiet workspace for transforming PPTX content plans into scheduled,
+              ready-to-publish LinkedIn posts.
+            </p>
+          </div>
 
-        <UploadZone
-          uploading={uploading}
-          onFile={onUpload}
-          pct={uploadPct}
-          bytes={uploadBytes}
-          total={uploadTotal}
-          paused={uploadPaused}
-          onPause={pauseUpload}
-          onResume={resumeUpload}
-          onCancel={cancelUpload}
-        />
+          <UploadZone
+            uploading={uploading}
+            onFile={onUpload}
+            pct={uploadPct}
+            bytes={uploadBytes}
+            total={uploadTotal}
+            paused={uploadPaused}
+            onPause={pauseUpload}
+            onResume={resumeUpload}
+            onCancel={cancelUpload}
+          />
+        </section>
+
+        {/* How it works — minimalist numbered list */}
+        <section className="space-y-10">
+          <div className="space-y-3">
+            <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">The Process</div>
+            <h2 className="font-serif text-3xl tracking-tight">How it works</h2>
+          </div>
+          <ol className="grid gap-10 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+            {[
+              {
+                t: "Connect LinkedIn",
+                c: (
+                  <>
+                    <LinkedInGuideDialog />. Open <em>Settings</em>, click <em>Connect with LinkedIn</em>,
+                    sign in and grant permissions.
+                  </>
+                ),
+              },
+              { t: "Choose language", c: "In Settings, pick the target language for your published posts." },
+              {
+                t: "Upload PPTX",
+                c: "Drag & drop or pick your content file. The AI extracts captions, images, videos, date, time and hashtags — and translates automatically. This can take a few minutes.",
+              },
+              { t: "Review & edit", c: "Check each post and adjust text, CTA, hashtags or scheduled time as needed." },
+              { t: "Publish", c: "Posts go live automatically at the scheduled time — or instantly with Send now." },
+              { t: "Privacy", c: <DataSecurityDialog /> },
+            ].map((step, i) => (
+              <li key={i} className="space-y-3 border-t border-border pt-6">
+                <div className="font-serif text-3xl text-foreground/80">
+                  {String(i + 1).padStart(2, "0")}
+                </div>
+                <div className="text-[11px] uppercase tracking-widest text-foreground">{step.t}</div>
+                <div className="text-sm text-muted-foreground leading-relaxed">{step.c}</div>
+              </li>
+            ))}
+          </ol>
+        </section>
 
         {batches.length > 0 && (
-          <section>
-            <h2 className="font-semibold mb-3">PPTX uploads</h2>
-            <div className="grid gap-2">
+          <section className="space-y-6">
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">Library</div>
+              <h2 className="font-serif text-3xl tracking-tight">PPTX uploads</h2>
+            </div>
+            <div className="grid gap-px bg-border border border-border">
               {batches.map((b) => (
-                <Card key={b.id} className="px-4 py-3 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div key={b.id} className="px-6 py-5 bg-background flex items-center justify-between">
+                  <div className="flex items-center gap-4">
                     <StatusIcon status={b.status} />
                     <div>
                       <div className="text-sm font-medium">{b.name}</div>
-                      <div className="text-xs text-muted-foreground">
+                      <div className="text-xs text-muted-foreground mt-0.5">
                         {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
                         {b.error && ` · ${b.error}`}
                       </div>
                     </div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={() => deleteBatch(b.id)}><Trash2 /></Button>
-                </Card>
+                </div>
               ))}
             </div>
           </section>
         )}
 
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="font-semibold">Scheduled posts ({posts.length})</h2>
+        <section className="space-y-6">
+          <div className="flex items-end justify-between">
+            <div className="space-y-2">
+              <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">Calendar</div>
+              <h2 className="font-serif text-3xl tracking-tight">Scheduled posts</h2>
+            </div>
+            <div className="text-xs uppercase tracking-widest text-muted-foreground">
+              {posts.length} {posts.length === 1 ? "post" : "posts"}
+            </div>
           </div>
           {posts.length === 0 ? (
-            <Card className="p-12 text-center text-muted-foreground">
+            <Card className="p-20 text-center text-muted-foreground text-sm">
               No posts yet. Upload a PPTX to get started.
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid gap-6">
               {posts.map((p) => (
                 <PostCard key={p.id} post={p} lang={lang} onPublish={() => publishNow(p.id)} onDelete={() => deletePost(p.id)} onUpdate={(patch) => updatePost(p.id, patch)} />
               ))}
