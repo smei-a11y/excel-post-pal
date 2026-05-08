@@ -58,6 +58,9 @@ async function callApi(action, payload) {
   return res.json();
 }
 
+// Mutex: at most 1 batch in flight per instance (matches Cloud Run concurrency=1)
+let busy = false;
+
 http.createServer(async (req, res) => {
   if (req.method === "GET" && (req.url === "/" || req.url === "/health")) {
     res.writeHead(200, { "Content-Type": "text/plain" }); res.end("ok"); return;
@@ -87,12 +90,39 @@ http.createServer(async (req, res) => {
 
 async function handleBatchById(batchId) {
   console.log(`[worker] received trigger for batch ${batchId}`);
-  let claim;
-  try { claim = await callApi("claim-batch", { batchId }); }
-  catch (e) { console.error("[claim] error", e.message); return; }
-  if (!claim.claimed) { console.log(`[worker] batch ${batchId} not in 'queued', skipping`); return; }
-  await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
+  if (busy) { console.log(`[worker] busy, skipping trigger for ${batchId}`); return; }
+  busy = true;
+  try {
+    const claim = await callApi("claim-batch", { batchId });
+    if (!claim.claimed) { console.log(`[worker] batch ${batchId} not in 'queued', skipping`); return; }
+    await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
+  } catch (e) {
+    console.error("[handle] error", e.message);
+  } finally {
+    busy = false;
+  }
 }
+
+// Polling loop: every 30s, claim the next queued batch (race-safe via SQL lock).
+// Catches batches missed by the HTTP trigger (cold start, redeploy, instance scaled to 0).
+const POLL_INTERVAL_MS = 30_000;
+async function pollOnce() {
+  if (busy) return;
+  busy = true;
+  try {
+    const claim = await callApi("claim-next", {});
+    if (!claim.claimed) return;
+    console.log(`[poll] picked up batch ${claim.batch.id}`);
+    await processBatch(claim.batch, claim.captionLanguage, claim.downloadUrl);
+  } catch (e) {
+    console.error("[poll] error", e.message);
+  } finally {
+    busy = false;
+  }
+}
+setInterval(() => { pollOnce().catch((e) => console.error("[poll] unexpected", e)); }, POLL_INTERVAL_MS);
+// Kick off first poll shortly after boot
+setTimeout(() => { pollOnce().catch(() => {}); }, 3000);
 
 async function streamToFile(url, filePath) {
   const res = await fetch(url);
