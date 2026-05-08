@@ -5,7 +5,7 @@
 //   3. First pass: extract slide text + media entry references (no bytes loaded)
 //   4. Call AI with text only
 //   5. Second pass: stream each media entry one at a time, base64, POST, release
-import { createWriteStream, createReadStream, promises as fsp } from "fs";
+import { createWriteStream, promises as fsp } from "fs";
 import { pipeline } from "stream/promises";
 import { Readable } from "stream";
 import { tmpdir } from "os";
