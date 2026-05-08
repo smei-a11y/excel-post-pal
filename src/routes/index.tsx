@@ -293,9 +293,11 @@ function App() {
       toast.error("Please upload a PPTX file");
       return;
     }
-    const MAX_BYTES = 1024 * 1024 * 1024; // 1 GB
+    const MAX_BYTES = 100 * 1024 * 1024; // 100 MB
     if (file.size > MAX_BYTES) {
-      toast.error("File too large — maximum is 1 GB");
+      toast.error("File too large — maximum is 100 MB", {
+        description: "Larger PPTX files exceed the worker's memory limit. Split your deck into smaller files.",
+      });
       return;
     }
     setUploading(true);
