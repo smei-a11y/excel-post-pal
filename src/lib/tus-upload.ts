@@ -92,7 +92,7 @@ export async function tusUpload({
     return token;
   };
 
-  const initialToken = await getFreshToken();
+  await getFreshToken();
 
   return new Promise<void>((resolve, reject) => {
     const upload = new tus.Upload(file, {
@@ -100,8 +100,6 @@ export async function tusUpload({
       // Long retry window — survives WLAN drops, sleep, brief offline periods.
       retryDelays: [0, 2000, 5000, 10000, 20000, 30000, 60000, 60000, 60000],
       headers: {
-        Authorization: `Bearer ${initialToken}`,
-        apikey: SUPABASE_PUBLISHABLE_KEY,
         "x-upsert": "true",
       },
       // Do not send the first 6 MB together with the upload-creation request.
@@ -130,7 +128,10 @@ export async function tusUpload({
       },
       onBeforeRequest: async (req) => {
         const t = await getFreshToken();
-        req.setHeader("Authorization", `Bearer ${t}`);
+        // Set auth exactly once per XHR request. Do not also pass it via
+        // `headers`, because XMLHttpRequest appends duplicate headers as
+        // "Bearer a, Bearer b", which Storage rejects as "Invalid Compact JWS".
+        req.setHeader("authorization", `Bearer ${t}`);
         req.setHeader("apikey", SUPABASE_PUBLISHABLE_KEY);
       },
       onError: (err) => reject(err),
