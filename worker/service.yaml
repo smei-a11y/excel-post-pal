@@ -52,7 +52,7 @@ spec:
           resources:
             limits:
               cpu: "2"
-              memory: 2Gi
+              memory: 4Gi
           env:
             - name: SUPABASE_URL
               value: "https://kbcqvqfnavkagdngapff.supabase.co"
