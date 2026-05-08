@@ -2,7 +2,9 @@ import * as tus from "tus-js-client";
 import { supabase } from "@/integrations/supabase/client";
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+const SUPABASE_PUBLISHABLE_KEY = (
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY
+) as string;
 
 function getStorageEndpoint() {
   const url = new URL(SUPABASE_URL);
@@ -12,8 +14,36 @@ function getStorageEndpoint() {
   return `${url.origin}/storage/v1/upload/resumable`;
 }
 
-function isCompactJwt(token?: string | null) {
-  return !!token && token.split(".").length === 3;
+function decodeJwtPayload(token: string): { aud?: unknown; exp?: unknown; role?: unknown; sub?: unknown } | null {
+  try {
+    const payload = token.split(".")[1];
+    const padded = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
+    return JSON.parse(globalThis.atob(padded));
+  } catch {
+    return null;
+  }
+}
+
+function normalizeSupabaseJwt(token?: string | null) {
+  let normalized = token?.trim();
+  if (!normalized) return null;
+
+  normalized = normalized.replace(/^Bearer\s+/i, "").trim();
+  if (
+    (normalized.startsWith('"') && normalized.endsWith('"')) ||
+    (normalized.startsWith("'") && normalized.endsWith("'"))
+  ) {
+    normalized = normalized.slice(1, -1).trim();
+  }
+
+  if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(normalized)) return null;
+
+  const payload = decodeJwtPayload(normalized);
+  const expiresAt = typeof payload?.exp === "number" ? payload.exp * 1000 : 0;
+  const isSupabaseUserToken = payload?.aud === "authenticated" && payload?.role === "authenticated" && typeof payload?.sub === "string";
+
+  if (!isSupabaseUserToken || expiresAt - Date.now() < 2 * 60 * 1000) return null;
+  return normalized;
 }
 
 export type TusHandle = {
@@ -35,24 +65,27 @@ export async function tusUpload({
   onProgress?: (pct: number, bytesUploaded: number, bytesTotal: number) => void;
   onHandle?: (h: TusHandle) => void;
 }): Promise<void> {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error("Upload-Konfiguration fehlt. Bitte Seite neu laden und erneut versuchen.");
+  }
+
   // Always validate/refresh before each request. getSession() can return a
   // locally cached token; Storage rejects malformed cached tokens as
-  // "Invalid Compact JWS", so we verify the JWT shape and refresh if needed.
+  // "Invalid Compact JWS", so we normalize the token and verify it is an
+  // authenticated Supabase user JWT before sending it to Storage.
   const getFreshToken = async () => {
     let { data, error } = await supabase.auth.getSession();
-    let token = data.session?.access_token;
-    const expiresSoon = data.session?.expires_at
-      ? data.session.expires_at * 1000 - Date.now() < 2 * 60 * 1000
-      : false;
+    let token = normalizeSupabaseJwt(data.session?.access_token);
 
-    if (error || !isCompactJwt(token) || expiresSoon) {
+    if (error || !token) {
       const refreshed = await supabase.auth.refreshSession();
       data = refreshed.data;
       error = refreshed.error;
-      token = data.session?.access_token;
+      token = normalizeSupabaseJwt(data.session?.access_token);
     }
 
-    if (error || !isCompactJwt(token)) {
+    if (error || !token) {
+      await supabase.auth.signOut({ scope: "local" });
       throw new Error("Deine Sitzung ist abgelaufen. Bitte einmal neu einloggen und denselben Upload erneut starten.");
     }
 
