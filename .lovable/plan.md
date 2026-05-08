@@ -1,67 +1,73 @@
-## Problem
+## Ziel
+Worker-Code aus GitHub im Cloud Shell holen und nach Cloud Run deployen — mit den bereits implementierten Änderungen (Stream-Upload + Polling-Loop).
 
-1. **Race-Condition** — Worker reagiert nur auf POST `/process`. Trifft der Trigger den Worker während Cold-Start/Redeploy, bleibt der Batch auf `queued` hängen.
-2. **Worker crasht bei großen Medien** — `buf.toString("base64")` + JSON-Body sprengt das V8-Stringlimit (~512 MB). Genau das hat Batch `684fc124…` auf `error` gesetzt.
+## Schritte im Cloud Shell
 
-## Lösung
-
-### Teil A — Direct-Upload für große Medien (Option 1)
-
-Statt jedes Medium als base64 in einem JSON-Body zur `worker-api` zu schicken, lädt der Worker das Medium direkt in den Storage hoch. Worker bekommt dafür eine **signed upload URL** und streamt den Zip-Eintrag direkt rein — nie als String im RAM.
-
-**`worker-api` neue Actions:**
-- `presign-upload` → input `{ userId, batchId, postId, index, ext }` → erzeugt mit `createSignedUploadUrl` einen Upload-Link für `post-images` Bucket, gibt `{ uploadUrl, token, path, publicUrl }` zurück
-- `register-media` → input `{ userId, postId, path, publicUrl, sortOrder }` → fügt Eintrag in `post_images` ein (gleiche Felder wie heute)
-
-**`worker/index.js` Änderungen:**
-- `create-post` wird ohne `media`-Array aufgerufen → bekommt nur die `postId`
-- Pro Medium: `presign-upload` → `entry.openReadStream()` per `fetch PUT uploadUrl` direkt hochladen → `register-media`
-- Existierender `readEntryToBuffer` + `toString("base64")` Code wird entfernt
-
-**Effekt:** Auch 1-GB-Videos laufen ohne RAM-Spitze durch. Storage-Pfade und `post_images`-Einträge bleiben identisch zu heute, Frontend sieht keinen Unterschied.
-
-### Teil B — Polling-Loop im Worker
-
-**`worker-api` neue Action `claim-next`:**
-- Ruft die existierende `claim_next_batch()` SQL-Funktion auf (race-safe via `FOR UPDATE SKIP LOCKED`)
-- Antwort identisch zu `claim-batch`: `{ claimed, batch, captionLanguage, downloadUrl }`
-
-**`worker/index.js` Änderungen:**
-- Beim Boot Polling-Loop starten: alle 30 s `claim-next` aufrufen
-- Wenn ein Batch zurückkommt → `processBatch` damit starten
-- Mutex-Flag damit nicht zwei parallele Loops/HTTP-Trigger denselben Worker doppelt belasten (max. 1 Batch gleichzeitig pro Instanz, passt zu Cloud Run `concurrency=1`)
-- HTTP-`/process`-Endpoint bleibt unverändert (schneller Pfad)
-
-### Teil C — Hängenden Batch reparieren
-
-Batch `684fc124-4ace-4574-b379-709cd3b1b6fd` per Migration von `error` zurück auf `queued` setzen und `error`-Feld leeren — der Polling-Loop greift ihn nach dem Worker-Update automatisch ab (jetzt mit Direct-Upload für das große Video).
-
-## Was du als User danach machen musst
-
-Worker neu bauen + deployen (gleicher Befehl wie letztes Mal, einziger Unterschied: `--min-instances 1` statt `0`, sonst skaliert Cloud Run nach Inaktivität auf null und niemand pollt):
-
+### 1. Repo klonen
 ```bash
-cd worker
-gcloud builds submit --tag europe-west1-docker.pkg.dev/PROJECT_ID/pptx-worker/pptx-worker:latest .
+cd ~
+git clone https://github.com/<DEIN-GH-USER>/<DEIN-REPO>.git
+cd <DEIN-REPO>/worker
+```
+Den Repo-Pfad findest du in Lovable: Plus (+) Menü → GitHub → der Link zum verbundenen Repo.
+
+### 2. Project & Region setzen
+```bash
+gcloud config set project project-b149e95e-3855-42c1-b8a
+gcloud config set run/region europe-west1
+```
+
+### 3. Artifact Registry vorbereiten (einmalig)
+Falls das Repository `pptx-worker` noch nicht existiert:
+```bash
+gcloud artifacts repositories create pptx-worker \
+  --repository-format=docker \
+  --location=europe-west1 \
+  --description="PPTX Worker images"
+```
+Falls schon existiert → Fehler ignorieren.
+
+### 4. Build (aus dem `worker/` Verzeichnis!)
+```bash
+gcloud builds submit \
+  --tag europe-west1-docker.pkg.dev/project-b149e95e-3855-42c1-b8a/pptx-worker/pptx-worker:latest \
+  .
+```
+Wichtig: der Punkt `.` am Ende und du musst im `worker/` Ordner stehen (sonst „Dockerfile required").
+
+### 5. Deploy mit Polling-Konfiguration
+```bash
 gcloud run deploy pptx-worker \
-  --image europe-west1-docker.pkg.dev/PROJECT_ID/pptx-worker/pptx-worker:latest \
-  --region europe-west1 --memory 4Gi --cpu 2 --timeout 3600 \
-  --concurrency 1 --no-cpu-throttling \
+  --image europe-west1-docker.pkg.dev/project-b149e95e-3855-42c1-b8a/pptx-worker/pptx-worker:latest \
+  --region europe-west1 \
+  --memory 4Gi --cpu 2 \
+  --timeout 3600 \
+  --concurrency 1 \
+  --no-cpu-throttling \
   --min-instances 1 --max-instances 3 \
   --allow-unauthenticated
 ```
 
-Innerhalb von 30 s greift sich der Worker den hängenden Batch automatisch.
+### 6. Env Vars prüfen
+Falls Env Vars beim Deploy verloren gehen, neu setzen:
+```bash
+gcloud run services update pptx-worker --region europe-west1 \
+  --set-env-vars SUPABASE_URL=...,SUPABASE_SERVICE_ROLE_KEY=...,LOVABLE_API_KEY=...,WORKER_SHARED_SECRET=...
+```
+(Werte aus deinem bisherigen Deployment.)
 
-## Geänderte Dateien
+### 7. Verifikation
+```bash
+# Health-Check
+curl https://pptx-worker-XXX.run.app/health
 
-- `worker/index.js` — Polling-Loop + Stream-Upload statt base64
-- `supabase/functions/worker-api/index.ts` — neue Actions `claim-next`, `presign-upload`, `register-media`
-- Migration: Reset von Batch `684fc124…` auf `queued`
+# Logs ansehen — nach ~30s sollte „pollOnce" auftauchen
+gcloud run services logs read pptx-worker --region europe-west1 --limit 50
+```
+Erwartung: Polling-Loop startet, claimt den stuck Batch `684fc124…` und verarbeitet ihn.
 
-**NICHT geändert:** Frontend, DB-Schema, `trigger-worker` Edge Function, Storage-Bucket-Struktur.
-
-## Risiken
-
-- `createSignedUploadUrl` ist seit `@supabase/supabase-js` v2.16 verfügbar → ok
-- `min-instances=1` kostet ein paar Cent/Monat fixe Idle-CPU — notwendig fürs Polling
+## Häufige Stolpersteine
+- **„Dockerfile required"** → du bist nicht in `worker/`. `pwd` checken, dann `cd worker`.
+- **„Image not found"** beim Deploy → Build ist fehlgeschlagen. Logs vom Build prüfen: `gcloud builds list --limit 3`.
+- **Worker startet, polled aber nicht** → `min-instances` ist 0. Mit Schritt 5 nochmal deployen.
+- **„permission denied" auf Artifact Registry** → einmalig `gcloud auth configure-docker europe-west1-docker.pkg.dev` ausführen.
