@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
 
       const { data: signed, error: sErr } = await admin.storage
         .from("post-pdfs")
-        .createSignedUrl(claimed.pdf_path, 600);
+        .createSignedUrl(claimed.pdf_path, 3600);
       if (sErr) return json({ error: "signed url failed: " + sErr.message }, 500);
 
       return json({
