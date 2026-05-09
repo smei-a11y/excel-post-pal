@@ -125,6 +125,10 @@ function LoginPage() {
         <Button variant="outline" className="w-full" onClick={onGoogle} disabled={loading}>
           Sign in with Google
         </Button>
+
+        <div className="text-center text-xs text-muted-foreground">
+          <DataSecurityDialog />
+        </div>
       </Card>
     </div>
   );
