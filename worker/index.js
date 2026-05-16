@@ -284,45 +284,77 @@ async function processBatch(batch, captionLanguage, downloadUrl) {
       const postId = createRes.postId;
 
       // 2. For each media: presign → stream PUT to storage → register
+      //    Videos are compressed via ffmpeg first (H.264/AAC, max 1080p, CRF 28).
       if (slide) {
         let i = 0;
         for (const mPath of slide.mediaPaths) {
-          const ext = (mPath.split(".").pop() || "").toLowerCase();
+          const rawExt = (mPath.split(".").pop() || "").toLowerCase();
+          const isVideo = VIDEO_EXTS.has(rawExt);
+          const ext = isVideo ? "mp4" : rawExt;
           const ct = mimeFromExt(ext);
           if (!ct) continue;
           const entry = entries.get(mPath);
           if (!entry) continue;
 
-          const presign = await callApi("presign-upload", {
-            userId, batchId, postId, index: i, ext,
-          });
+          let uploadPath = null;   // tmp file path to upload from
+          let cleanupPaths = [];
+          let uploadSize = 0;
 
-          const stream = await entry.openReadStream();
-          const size = entry.uncompressedSize;
-          console.log(`[batch ${batchId}] uploading ${mPath} (${(size / 1024 / 1024).toFixed(1)} MB) → ${presign.path}`);
+          try {
+            if (isVideo) {
+              // Extract zip entry to tmp, compress, then upload compressed file.
+              const inPath = path.join(tmpdir(), `vidin-${randomUUID()}.${rawExt}`);
+              cleanupPaths.push(inPath);
+              await pipeline(await entry.openReadStream(), createWriteStream(inPath));
+              const inStat = await fsp.stat(inPath);
+              console.log(`[batch ${batchId}] compressing ${mPath} (${(inStat.size / 1024 / 1024).toFixed(1)} MB)`);
+              const outPath = await compressVideo(inPath);
+              cleanupPaths.push(outPath);
+              const outStat = await fsp.stat(outPath);
+              uploadPath = outPath;
+              uploadSize = outStat.size;
+              console.log(`[batch ${batchId}] compressed → ${(outStat.size / 1024 / 1024).toFixed(1)} MB (${Math.round((1 - outStat.size / inStat.size) * 100)}% smaller)`);
+            } else {
+              uploadSize = entry.uncompressedSize;
+            }
 
-          const upRes = await fetch(presign.uploadUrl, {
-            method: "PUT",
-            headers: {
-              "content-type": ct,
-              "content-length": String(size),
-              "x-upsert": "true",
-            },
-            body: Readable.toWeb(stream),
-            duplex: "half",
-          });
-          if (!upRes.ok) {
-            const t = await upRes.text().catch(() => "");
-            throw new Error(`storage upload failed ${upRes.status}: ${t}`);
+            const presign = await callApi("presign-upload", {
+              userId, batchId, postId, index: i, ext,
+            });
+
+            const body = uploadPath
+              ? Readable.toWeb(createReadStream(uploadPath))
+              : Readable.toWeb(await entry.openReadStream());
+
+            console.log(`[batch ${batchId}] uploading ${mPath} (${(uploadSize / 1024 / 1024).toFixed(1)} MB) → ${presign.path}`);
+
+            const upRes = await fetch(presign.uploadUrl, {
+              method: "PUT",
+              headers: {
+                "content-type": ct,
+                "content-length": String(uploadSize),
+                "x-upsert": "true",
+              },
+              body,
+              duplex: "half",
+            });
+            if (!upRes.ok) {
+              const t = await upRes.text().catch(() => "");
+              throw new Error(`storage upload failed ${upRes.status}: ${t}`);
+            }
+
+            await callApi("register-media", {
+              userId, postId,
+              path: presign.path,
+              publicUrl: presign.publicUrl,
+              sortOrder: i,
+            });
+            i++;
+          } finally {
+            for (const p of cleanupPaths) {
+              try { await fsp.unlink(p); } catch {}
+            }
           }
-
-          await callApi("register-media", {
-            userId, postId,
-            path: presign.path,
-            publicUrl: presign.publicUrl,
-            sortOrder: i,
-          });
-          i++;
         }
       }
     }
