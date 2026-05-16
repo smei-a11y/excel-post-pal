@@ -5,13 +5,45 @@
 //   3. First pass: extract slide text + media entry references (no bytes loaded)
 //   4. Call AI with text only
 //   5. Second pass: stream each media entry one at a time, base64, POST, release
-import { createWriteStream, promises as fsp } from "fs";
+import { createWriteStream, createReadStream, promises as fsp } from "fs";
 import { pipeline } from "stream/promises";
 import { Readable } from "stream";
 import { tmpdir } from "os";
 import path from "path";
 import http from "http";
+import { spawn } from "child_process";
+import { randomUUID } from "crypto";
 import { open as openZip } from "yauzl-promise";
+
+const VIDEO_EXTS = new Set(["mp4", "mov", "m4v", "webm"]);
+
+// Compress a video file with ffmpeg. Returns the output file path (always mp4).
+async function compressVideo(inputPath) {
+  const outPath = path.join(tmpdir(), `vid-${randomUUID()}.mp4`);
+  await new Promise((resolve, reject) => {
+    const ff = spawn("ffmpeg", [
+      "-y",
+      "-i", inputPath,
+      "-vf", "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+      "-c:v", "libx264",
+      "-preset", "veryfast",
+      "-crf", "28",
+      "-pix_fmt", "yuv420p",
+      "-c:a", "aac",
+      "-b:a", "128k",
+      "-movflags", "+faststart",
+      outPath,
+    ], { stdio: ["ignore", "ignore", "pipe"] });
+    let err = "";
+    ff.stderr.on("data", (d) => { err += d.toString(); });
+    ff.on("error", reject);
+    ff.on("close", (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg exited ${code}: ${err.slice(-500)}`));
+    });
+  });
+  return outPath;
+}
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const WORKER_SHARED_SECRET = process.env.WORKER_SHARED_SECRET;
