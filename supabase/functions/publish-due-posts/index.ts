@@ -51,11 +51,24 @@ async function uploadImage(token: string, author: string, imageUrl: string): Pro
 }
 
 async function uploadVideo(token: string, author: string, videoUrl: string): Promise<string> {
-  // Download first to know size
-  const src = await fetch(videoUrl);
-  if (!src.ok) throw new Error(`Source video fetch failed: ${src.status}`);
-  const bytes = new Uint8Array(await src.arrayBuffer());
-  const fileSize = bytes.byteLength;
+  // Get file size via HEAD (avoid loading whole video into memory)
+  let fileSize = 0;
+  const head = await fetch(videoUrl, { method: "HEAD" });
+  if (head.ok) {
+    const cl = head.headers.get("content-length");
+    if (cl) fileSize = parseInt(cl, 10);
+  }
+  if (!fileSize) {
+    // Fallback: GET with Range 0-0 to read total size from Content-Range
+    const probe = await fetch(videoUrl, { headers: { Range: "bytes=0-0" } });
+    const cr = probe.headers.get("content-range"); // e.g. "bytes 0-0/12345"
+    if (cr) {
+      const m = cr.match(/\/(\d+)$/);
+      if (m) fileSize = parseInt(m[1], 10);
+    }
+    try { await probe.body?.cancel(); } catch {}
+  }
+  if (!fileSize) throw new Error("Could not determine video file size");
 
   const initRes = await liFetch(`/rest/videos?action=initializeUpload`, token, {
     method: "POST",
@@ -71,7 +84,12 @@ async function uploadVideo(token: string, author: string, videoUrl: string): Pro
 
   const etags: string[] = [];
   for (const ins of instructions) {
-    const chunk = bytes.slice(ins.firstByte, ins.lastByte + 1);
+    // Stream only the needed range from the source for this chunk
+    const partRes = await fetch(videoUrl, { headers: { Range: `bytes=${ins.firstByte}-${ins.lastByte}` } });
+    if (!partRes.ok && partRes.status !== 206) {
+      throw new Error(`Source range fetch failed: ${partRes.status}`);
+    }
+    const chunk = new Uint8Array(await partRes.arrayBuffer());
     const up = await fetch(ins.uploadUrl, {
       method: "PUT",
       headers: { Authorization: `Bearer ${token}` },
