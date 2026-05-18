@@ -244,7 +244,13 @@ function App() {
       .on("postgres_changes", { event: "*", schema: "public", table: "batches", filter: `user_id=eq.${userId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "posts", filter: `user_id=eq.${userId}` }, load)
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 15000);
+    return () => {
+      window.clearInterval(poll);
+      supabase.removeChannel(ch);
+    };
   }, [load, userId]);
 
   const onUpload = async (file: File) => {
