@@ -925,6 +925,102 @@ function BatchProgress({ startedAt, status }: { startedAt: string; status: strin
   );
 }
 
+function BatchSummary({ batches }: { batches: Batch[] }) {
+  const counts = batches.reduce(
+    (acc, b) => {
+      const k = (b.status === "queued" || b.status === "processing")
+        ? "processing"
+        : b.status === "ready"
+        ? "ready"
+        : b.status === "error"
+        ? "error"
+        : "other";
+      acc[k] = (acc[k] || 0) + 1;
+      return acc;
+    },
+    { processing: 0, ready: 0, error: 0, other: 0 } as Record<string, number>,
+  );
+  const items = [
+    { key: "ready", label: "Ready", count: counts.ready, icon: <CheckCircle2 className="h-4 w-4 text-success" />, cls: "border-success/30" },
+    { key: "processing", label: "Processing", count: counts.processing, icon: <Loader2 className={`h-4 w-4 text-primary ${counts.processing ? "animate-spin" : ""}`} />, cls: "border-primary/30" },
+    { key: "error", label: "Failed", count: counts.error, icon: <AlertCircle className="h-4 w-4 text-destructive" />, cls: "border-destructive/30" },
+  ];
+  return (
+    <div className="grid grid-cols-3 gap-px bg-border border border-border">
+      {items.map((it) => (
+        <div key={it.key} className={`bg-background px-5 py-4 flex items-center justify-between`}>
+          <div className="flex items-center gap-3">
+            {it.icon}
+            <span className="text-[11px] uppercase tracking-widest text-muted-foreground">{it.label}</span>
+          </div>
+          <span className="font-serif text-2xl tabular-nums">{it.count}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function BatchRow({ batch, onDelete }: { batch: Batch; onDelete: () => void }) {
+  const [showError, setShowError] = useState(false);
+  const isProcessing = batch.status === "queued" || batch.status === "processing";
+  const statusLabel: Record<string, string> = {
+    queued: "Queued",
+    processing: "Processing",
+    ready: "Ready",
+    error: "Failed",
+  };
+  const statusCls: Record<string, string> = {
+    queued: "bg-muted text-muted-foreground",
+    processing: "bg-primary/10 text-primary",
+    ready: "bg-success/15 text-success",
+    error: "bg-destructive/10 text-destructive",
+  };
+  return (
+    <div className="px-6 py-5 bg-background flex flex-col gap-3">
+      {isProcessing && <BatchProgress startedAt={batch.created_at} status={batch.status} />}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-4 min-w-0">
+          <StatusIcon status={batch.status} />
+          <div className="min-w-0">
+            <div className="text-sm font-medium truncate">{batch.name}</div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              {new Date(batch.created_at).toLocaleString("en-US")}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className={`text-[10px] uppercase tracking-widest px-2 py-1 rounded-full font-medium ${statusCls[batch.status] || "bg-muted text-muted-foreground"}`}>
+            {statusLabel[batch.status] || batch.status}
+          </span>
+          <Button variant="ghost" size="icon" onClick={onDelete}><Trash2 /></Button>
+        </div>
+      </div>
+      {batch.status === "error" && batch.error && (
+        <div className="ml-9 border border-destructive/30 bg-destructive/5 rounded-sm">
+          <button
+            type="button"
+            onClick={() => setShowError((v) => !v)}
+            className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left"
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0" />
+              <span className="text-xs font-medium text-destructive truncate">
+                {showError ? "Error details" : (batch.error.split("\n")[0].slice(0, 140) + (batch.error.length > 140 ? "…" : ""))}
+              </span>
+            </div>
+            {showError ? <ChevronUp className="h-3.5 w-3.5 text-destructive shrink-0" /> : <ChevronDown className="h-3.5 w-3.5 text-destructive shrink-0" />}
+          </button>
+          {showError && (
+            <pre className="px-3 pb-3 text-[11px] leading-relaxed text-destructive/90 whitespace-pre-wrap break-words font-mono max-h-64 overflow-y-auto">
+{batch.error}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function toLocalInput(iso: string) {
   const d = new Date(iso);
   const tz = d.getTimezoneOffset() * 60000;
