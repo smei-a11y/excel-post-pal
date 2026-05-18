@@ -578,26 +578,10 @@ function App() {
               <div className="text-[10px] uppercase tracking-luxury text-muted-foreground">Library</div>
               <h2 className="font-serif text-3xl tracking-tight">PPTX uploads</h2>
             </div>
+            <BatchSummary batches={batches} />
             <div className="grid gap-px bg-border border border-border">
               {batches.map((b) => (
-                <div key={b.id} className="px-6 py-5 bg-background flex flex-col gap-3">
-                  {(b.status === "queued" || b.status === "processing") && (
-                    <BatchProgress startedAt={b.created_at} status={b.status} />
-                  )}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <StatusIcon status={b.status} />
-                      <div>
-                        <div className="text-sm font-medium">{b.name}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">
-                          {new Date(b.created_at).toLocaleString("en-US")} · {b.status}
-                          {b.error && ` · ${b.error}`}
-                        </div>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon" onClick={() => deleteBatch(b.id)}><Trash2 /></Button>
-                  </div>
-                </div>
+                <BatchRow key={b.id} batch={b} onDelete={() => deleteBatch(b.id)} />
               ))}
             </div>
           </section>
