@@ -236,6 +236,10 @@ function App() {
     setLiExpiresAt((s.data as any)?.linkedin_token_expires_at || null);
   }, [userId]);
 
+  // Poll only while a batch is actually being worked on — otherwise realtime
+  // alone keeps the UI in sync and the database can idle (saves compute cost).
+  const hasActiveBatch = batches.some((b) => b.status === "queued" || b.status === "processing");
+
   useEffect(() => {
     if (!userId) return;
     load();
@@ -244,14 +248,19 @@ function App() {
       .on("postgres_changes", { event: "*", schema: "public", table: "batches", filter: `user_id=eq.${userId}` }, load)
       .on("postgres_changes", { event: "*", schema: "public", table: "posts", filter: `user_id=eq.${userId}` }, load)
       .subscribe();
-    const poll = window.setInterval(() => {
-      if (document.visibilityState === "visible") load();
-    }, 15000);
     return () => {
-      window.clearInterval(poll);
       supabase.removeChannel(ch);
     };
   }, [load, userId]);
+
+  useEffect(() => {
+    if (!userId || !hasActiveBatch) return;
+    const poll = window.setInterval(() => {
+      if (document.visibilityState === "visible") load();
+    }, 20000);
+    return () => window.clearInterval(poll);
+  }, [load, userId, hasActiveBatch]);
+
 
   const onUpload = async (file: File) => {
     if (!userId) return;
